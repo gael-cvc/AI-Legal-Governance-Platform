@@ -1,0 +1,7 @@
+{
+  "n_vectors": 2016,
+  "dimension": 384,
+  "index_type": "IndexFlatIP",
+  "metric": "cosine (via normalized L2 + IP)",
+  "n_chunks": 2016
+}

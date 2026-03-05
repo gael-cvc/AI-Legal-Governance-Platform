@@ -1,0 +1,101 @@
+{
+  "size_stats": {
+    "total_chunks": 2016,
+    "min_chars": 34,
+    "max_chars": 2079,
+    "avg_chars": 819,
+    "median_chars": 937,
+    "trop_courts": 30,
+    "trop_longs": 1,
+    "distribution": {
+      "0-100 chars (trop court)": 30,
+      "100-500 chars": 410,
+      "500-1000 chars": 741,
+      "1000-1500 chars (optimal)": 832,
+      "1500-2000 chars": 2,
+      "2000+ chars (trop long)": 1
+    }
+  },
+  "coverage": {
+    "par_reglementation": {
+      "CNIL": 454,
+      "DATA_GOVERNANCE_ACT": 247,
+      "EDPB": 31,
+      "EU_AI_ACT": 800,
+      "GDPR": 484
+    },
+    "par_type_segment": {
+      "annex": 116,
+      "article": 663,
+      "chapter": 25,
+      "freetext": 454,
+      "recital": 733,
+      "section": 25
+    },
+    "par_fichier_source": {
+      "ai_act_annexes.pdf": 52,
+      "ai_act_full.pdf": 748,
+      "cnil_ai_how_to_comply.pdf": 35,
+      "cnil_ai_recommendations.pdf": 419,
+      "data_governance_act.pdf": 247,
+      "edpb_automated_decision.pdf": 31,
+      "rgpd_full.pdf": 482,
+      "rgpd_recitals.pdf": 2
+    }
+  },
+  "critical_segments": {
+    "GDPR": {
+      "status": "✅ complet",
+      "details": {
+        "Article 5": "✅ présent",
+        "Article 6": "✅ présent",
+        "Article 9": "✅ présent",
+        "Article 17": "✅ présent",
+        "Article 22": "✅ présent"
+      }
+    },
+    "EU_AI_ACT": {
+      "status": "✅ complet",
+      "details": {
+        "Article 5": "✅ présent",
+        "Article 6": "✅ présent",
+        "Article 9": "✅ présent",
+        "Article 10": "✅ présent",
+        "Article 13": "✅ présent"
+      }
+    },
+    "DATA_GOVERNANCE_ACT": {
+      "status": "✅ complet",
+      "details": {
+        "Article 2": "✅ présent",
+        "Article 5": "✅ présent",
+        "Article 10": "✅ présent"
+      }
+    },
+    "EDPB": {
+      "status": "✅ complet",
+      "details": {
+        "Section I": "✅ présent",
+        "Section II": "✅ présent",
+        "Section IV": "✅ présent"
+      }
+    },
+    "CNIL": {
+      "status": "N/A (freetext)",
+      "details": {}
+    }
+  },
+  "metadata_completeness": {
+    "chunk_id": "✅ 100% rempli (2016/2016)",
+    "text": "✅ 100% rempli (2016/2016)",
+    "segment_id": "✅ 100% rempli (2016/2016)",
+    "segment_type": "✅ 100% rempli (2016/2016)",
+    "regulation": "✅ 100% rempli (2016/2016)",
+    "document_type": "✅ 100% rempli (2016/2016)",
+    "year": "✅ 100% rempli (2016/2016)",
+    "jurisdiction": "✅ 100% rempli (2016/2016)",
+    "official_title": "✅ 100% rempli (2016/2016)",
+    "source_file": "✅ 100% rempli (2016/2016)",
+    "page_start": "✅ 100% rempli (2016/2016)"
+  }
+}

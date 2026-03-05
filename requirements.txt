@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pymupdf
+sentence-transformers
+faiss-cpu
+transformers
+scikit-learn
+numpy
+pandas
+tiktoken
+python-dotenv
+regex
