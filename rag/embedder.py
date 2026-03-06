@@ -1,39 +1,54 @@
 """
-=============================================================================
 embedder.py — Encodage des chunks en vecteurs avec sentence-transformers
 =============================================================================
 
 RÔLE DE CE FICHIER :
-Transformer chaque chunk de texte en un vecteur numérique (embedding).
+Transformer chaque chunk de texte juridique en un vecteur numérique
+(embedding) qui représente son sens dans un espace mathématique à 384 dimensions.
 
-DEFINITION EMBEDDING:
-Un embedding = une liste de nombres (ex: [0.23, -0.81, 0.45, ...]) qui
-représente le SENS du texte dans un espace mathématique à 384 dimensions.
+QU'EST-CE QU'UN EMBEDDING ?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Un embedding = une liste de 384 nombres flottants qui encode le SENS
+d'un texte. Ce n'est pas une représentation des mots (comme TF-IDF),
+c'est une représentation de la sémantique : deux textes qui veulent dire
+la même chose produisent des vecteurs mathématiquement proches, même
+s'ils utilisent des mots différents ou des langues différentes.
 
-Deux phrases qui ont le même sens auront des vecteurs proches.
-Deux phrases qui parlent de sujets différents auront des vecteurs éloignés.
+EXEMPLE CONCRET :
+    "Le responsable de traitement doit informer les personnes"
+    → vecteur A : [0.23, -0.81, 0.45, 0.12, ...]   (384 dimensions)
 
-EXEMPLE :
-"Le responsable de traitement doit informer les personnes"
-→ [0.23, -0.81, 0.45, 0.12, ...]   (384 nombres)
+    "The data controller must notify individuals"
+    → vecteur B : [0.24, -0.79, 0.46, 0.11, ...]
 
-"The data controller must notify individuals"
-→ [0.24, -0.79, 0.46, 0.11, ...]   (très proche ! même sens, langue différente)
+    cosine_similarity(A, B) ≈ 0.94  ← très proches (même sens, langues différentes)
 
-"La météo est agréable aujourd'hui"
-→ [-0.55, 0.32, -0.12, 0.88, ...]  (très différent, sujet différent)
+    "La météo est agréable aujourd'hui"
+    → vecteur C : [-0.55, 0.32, -0.12, 0.88, ...]
 
-POURQUOI sentence-transformers ?
-C'est la librairie open-source de référence pour les embeddings de texte.
-On utilise le modèle "all-MiniLM-L6-v2" :
-- Rapide : encode 2000 chunks en ~30 secondes sur CPU
-- Léger : 80 Mo sur disque
-- Performant : très bon rapport qualité/vitesse pour les textes juridiques courts
-- Gratuit : pas d'API, tout tourne en local
+    cosine_similarity(A, C) ≈ 0.12  ← très éloignés (sujets différents)
+
+POURQUOI C'EST PUISSANT POUR LA RECHERCHE JURIDIQUE :
+Quand un utilisateur pose "What must a data controller do?", son vecteur
+sera proche des chunks qui parlent des obligations du responsable de traitement
+— même si ces chunks utilisent "controller shall", "processor must", etc.
+C'est la recherche sémantique, bien supérieure à la recherche par mots-clés.
+
+MODÈLE CHOISI : all-MiniLM-L6-v2
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    DIMENSION   : 384 → compact, rapide à chercher dans FAISS
+    CONTEXTE    : 256 tokens (~1000 chars) → nos chunks calibrés à 1200 chars
+                  (la légère troncature ne perd pas les informations clés)
+    PERFORMANCE : Score MTEB 59.9/100 → excellent rapport qualité/légèreté
+    TAILLE      : 80 Mo → téléchargement unique, cache automatique HuggingFace
+    VITESSE     : ~100 chunks/seconde sur CPU → 2016 chunks en ~20s
+
+    Alternative plus précise (si on veut améliorer à l'avenir) :
+    "BAAI/bge-large-en-v1.5" → dimension 1024, score MTEB 64.2, mais 1.3 Go
 
 FLUX DE DONNÉES :
-    list[str] (textes)  →  [encode()]  →  np.ndarray (vecteurs 384D)
-
+    list[str]  (textes des chunks)   →  encode()       →  np.ndarray (n, 384)
+    str        (question utilisateur) →  encode_query() →  np.ndarray (1, 384)
 =============================================================================
 """
 
@@ -41,26 +56,19 @@ from __future__ import annotations
 
 import logging
 import time
-from pathlib import Path
 
 import numpy as np
 
-# SentenceTransformer est la classe principale de la librairie sentence-transformers.
-# Elle charge un modèle pré-entraîné et expose une méthode .encode() pour vectoriser.
+# SentenceTransformer est la classe principale de sentence-transformers.
+# Elle télécharge et charge un modèle pré-entraîné depuis HuggingFace,
+# puis expose une méthode .encode() simple pour vectoriser du texte.
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger("rag.embedder")
 
-# ── Modèle choisi ──────────────────────────────────────────────────────────────
-# "all-MiniLM-L6-v2" est un excellent modèle pour notre cas :
-# - Dimension : 384 (compact, rapide à chercher dans FAISS)
-# - Contexte max : 256 tokens (~1000 chars) — nos chunks sont calibrés pour ça
-# - Score MTEB : 59.9 (très bon pour un modèle léger)
-# - Taille : 80 Mo (se télécharge une seule fois, mis en cache automatiquement)
-#
-# Alternative plus puissante pour plus de précision (mais plus lent) :
-# "BAAI/bge-large-en-v1.5" → dimension 1024, contexte 512 tokens
-
+# Nom du modèle HuggingFace à utiliser.
+# Constante en majuscules = convention Python pour les valeurs immuables.
+# Changer cette ligne suffit pour changer de modèle dans tout le projet.
 MODEL_NAME = "all-MiniLM-L6-v2"
 
 
@@ -68,54 +76,76 @@ class LegalEmbedder:
     """
     Encodeur de textes juridiques basé sur sentence-transformers.
 
-    Encapsule le modèle d'embedding et expose des méthodes claires
-    pour encoder des textes individuels ou des batches.
+    Cette classe encapsule le modèle d'embedding et expose deux méthodes :
+    - encode()       : encoder un batch de chunks (phase d'indexation)
+    - encode_query() : encoder une question utilisateur (phase de recherche)
 
-    PATTERN "SINGLETON LAZY" :
-    Le modèle n'est chargé en mémoire qu'une seule fois, à la première utilisation.
-    Charger un modèle prend 2-3 secondes — on ne veut pas le faire à chaque requête.
+    PATTERN LAZY LOADING :
+    Le modèle (~80 Mo en RAM) n'est chargé qu'au premier appel à encode()
+    ou à load(). On évite ainsi de charger un modèle lourd si la classe est
+    instanciée mais jamais utilisée (ex: dans les tests unitaires).
     """
 
     def __init__(self, model_name: str = MODEL_NAME):
         """
-        Initialise l'encodeur SANS charger le modèle tout de suite.
-        Le modèle est chargé au premier appel à encode() ou à load().
+        Initialise l'encodeur SANS charger le modèle immédiatement.
 
         Paramètre :
-            model_name : nom du modèle HuggingFace à utiliser
+            model_name : identifiant du modèle sur HuggingFace.
+                         Défaut : "all-MiniLM-L6-v2"
+                         Pour changer de modèle, modifier MODEL_NAME en haut du fichier.
         """
         self.model_name = model_name
-        # _model est None jusqu'au premier chargement (lazy loading)
+
+        # _model vaut None jusqu'au premier appel à load() ou encode().
+        # Le type hint "SentenceTransformer | None" documente les deux états possibles.
         self._model: SentenceTransformer | None = None
 
     def load(self) -> None:
         """
-        Charge le modèle en mémoire.
-        Télécharge automatiquement depuis HuggingFace si pas encore en cache.
-        Le cache est dans ~/.cache/huggingface/ — le téléchargement ne se fait qu'une fois.
+        Charge le modèle en mémoire depuis le cache HuggingFace.
+
+        PREMIER APPEL  : télécharge depuis huggingface.co (~80 Mo).
+                         Durée : 30-60s selon la connexion internet.
+        APPELS SUIVANTS : lit depuis ~/.cache/huggingface/ sur le disque local.
+                          Durée : ~2-3 secondes.
+
+        IDEMPOTENT : appeler load() plusieurs fois est sans danger —
+        le if self._model is not None empêche tout rechargement inutile.
         """
         if self._model is not None:
-            return  # Déjà chargé, rien à faire
+            return  # Déjà en mémoire → rien à faire
 
-        logger.info(f"Chargement du modèle d'embedding : {self.model_name}")
+        logger.info(f"Chargement du modèle : {self.model_name}")
         t0 = time.perf_counter()
 
-        # SentenceTransformer() télécharge et charge le modèle.
-        # device="cpu" = on utilise le CPU (pas de GPU nécessaire pour ce projet).
-        # Sur Mac M1/M2, on pourrait utiliser device="mps" pour accélérer,
-        # mais "cpu" est universel et suffisant pour 2000 chunks.
+        # SentenceTransformer() télécharge (si nécessaire) et charge le modèle.
+        # device="cpu" : on force le CPU — pas de GPU requis pour ce projet.
+        # Sur Mac M1/M2, device="mps" accélérerait l'encodage grâce au Neural Engine,
+        # mais device="cpu" est universel et suffisant pour 2016 chunks.
         self._model = SentenceTransformer(self.model_name, device="cpu")
 
         elapsed = time.perf_counter() - t0
-        logger.info(f"Modèle chargé en {elapsed:.2f}s")
-        logger.info(f"Dimension des embeddings : {self._model.get_sentence_embedding_dimension()}")
+        logger.info(
+            f"Modèle chargé en {elapsed:.2f}s | "
+            f"dimension : {self._model.get_sentence_embedding_dimension()}"
+        )
 
     @property
     def dimension(self) -> int:
         """
         Retourne la dimension des vecteurs produits par ce modèle.
-        Nécessaire pour initialiser l'index FAISS avec la bonne taille.
-        Pour all-MiniLM-L6-v2 : 384
+
+        Une @property se lit comme un attribut (embedder.dimension)
+        mais exécute du code. Ici : charge le modèle si pas encore fait,
+        puis retourne la dimension via l'API sentence-transformers.
+
+        Pourquoi cette méthode est nécessaire :
+        VectorStore.build() doit créer faiss.IndexFlatIP(dim) avec la bonne
+        dimension. Plutôt que de hardcoder 384, on interroge le modèle.
+        Si on change de modèle (ex: bge-large → dim=1024), tout s'adapte.
+
+        Pour all-MiniLM-L6-v2 : retourne 384.
         """
         if self._model is None:
             self.load()
@@ -128,77 +158,96 @@ class LegalEmbedder:
         show_progress: bool = True,
     ) -> np.ndarray:
         """
-        Encode une liste de textes en vecteurs.
+        Encode un batch de textes en vecteurs. Utilisé pendant l'indexation.
 
         PARAMÈTRES :
-            texts        : liste de textes à encoder
-            batch_size   : nombre de textes encodés en parallèle.
-                           64 est optimal pour CPU — assez grand pour être efficace,
-                           assez petit pour tenir en RAM.
-            show_progress: affiche une barre de progression (utile pour 2000 chunks)
+            texts         : liste des textes à encoder (ex: les 2016 chunks)
+            batch_size    : nombre de textes traités simultanément.
+                            64 est optimal sur CPU :
+                            → assez grand pour amortir les coûts de tokenisation batch
+                            → assez petit pour tenir en RAM sans overflow
+            show_progress : affiche une barre de progression tqdm
+                            (utile pendant les 20s d'encodage de 2016 chunks)
+
+        NORMALISATION L2 — pourquoi c'est critique :
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        normalize_embeddings=True normalise chaque vecteur à longueur 1 (norme = 1).
+        Formule : v_normalisé = v / ||v||  (on divise chaque composante par la norme)
+
+        Notre index FAISS utilise IndexFlatIP (Inner Product = produit scalaire).
+        Avec des vecteurs de norme 1, le produit scalaire A·B est EXACTEMENT
+        égal à la cosine similarity cos(θ) = A·B / (||A|| × ||B||).
+        → On obtient une similarité entre 0 et 1 directement interprétable.
+        Sans normalisation, IndexFlatIP calculerait autre chose que la cosine
+        similarity, et les scores seraient non comparables entre eux.
 
         RETOURNE :
-            np.ndarray de forme (len(texts), 384)
-            Chaque ligne = vecteur d'un texte
-            Ex pour 2016 chunks : tableau de forme (2016, 384)
-
-        NORMALISATION L2 :
-            normalize_embeddings=True normalise chaque vecteur à longueur 1.
-            Cela permet d'utiliser le produit scalaire (dot product) comme
-            mesure de similarité, équivalent au cosinus mais plus rapide.
-            FAISS IndexFlatIP (Inner Product) est optimisé pour ça.
+            np.ndarray de forme (len(texts), 384), dtype float32
+            Chaque ligne i = vecteur 384D du texte texts[i]
+            Ex pour 2016 chunks : tableau de 2016 × 384 = 776 448 floats
         """
         if self._model is None:
             self.load()
 
         if not texts:
-            # Cas edge : liste vide → retourne tableau vide de la bonne dimension
+            # Cas edge : liste vide → retourne tableau vide avec la bonne forme.
+            # Évite une erreur FAISS si on tente d'indexer 0 vecteurs.
             return np.zeros((0, self.dimension), dtype=np.float32)
 
-        logger.info(f"Encodage de {len(texts)} textes (batch_size={batch_size})...")
+        logger.info(f"Encodage de {len(texts)} textes | batch_size={batch_size}...")
         t0 = time.perf_counter()
 
-        # .encode() est la méthode principale de SentenceTransformer.
-        # Elle gère automatiquement le découpage en batches.
-        # convert_to_numpy=True → retourne np.ndarray (requis par FAISS)
-        # normalize_embeddings=True → normalisation L2 pour cosine similarity
         vectors = self._model.encode(
             texts,
-            batch_size=batch_size,
-            show_progress_bar=show_progress,
-            convert_to_numpy=True,
-            normalize_embeddings=True,  # IMPORTANT pour FAISS IndexFlatIP
+            batch_size           = batch_size,
+            show_progress_bar    = show_progress,  # barre tqdm dans le terminal
+            convert_to_numpy     = True,            # retourne np.ndarray (requis par FAISS)
+            normalize_embeddings = True,            # normalisation L2 → IndexFlatIP = cosine
         )
 
-        # On s'assure que le type est float32.
-        # FAISS exige float32 — float64 causerait une erreur silencieuse.
+        # On force float32 explicitement car FAISS l'exige.
+        # sentence-transformers retourne généralement float32, mais ce cast
+        # garantit la compatibilité et évite l'erreur cryptique FAISS
+        # "vector type must be float32" si jamais le modèle retourne float64.
         vectors = vectors.astype(np.float32)
 
         elapsed = time.perf_counter() - t0
         logger.info(
             f"Encodage terminé en {elapsed:.2f}s "
-            f"— {len(texts)/elapsed:.0f} chunks/sec "
-            f"— shape: {vectors.shape}"
+            f"({len(texts) / elapsed:.0f} chunks/sec) "
+            f"| shape: {vectors.shape}"
         )
 
         return vectors
 
     def encode_query(self, query: str) -> np.ndarray:
         """
-        Encode une seule requête utilisateur en vecteur.
-        Utilisé au moment de la recherche (pas de l'indexation).
+        Encode une seule question utilisateur. Utilisé pendant la recherche.
 
-        Retourne un vecteur de forme (1, 384) — compatible avec FAISS.search().
+        DIFFÉRENCE AVEC encode() :
+        encode()       → optimisé pour le débit (batch de 2016 chunks en 20s)
+        encode_query() → optimisé pour la latence (1 question en ~10ms)
+
+        COHÉRENCE DE NORMALISATION :
+        Il est essentiel d'utiliser la MÊME normalisation ici que dans encode().
+        Si les chunks sont normalisés mais pas la question (ou inversement),
+        le produit scalaire ne serait plus égal à la cosine similarity
+        et tous les scores de recherche seraient faux.
+
+        RETOURNE :
+            np.ndarray de forme (1, 384), dtype float32
+            FAISS.index.search() exige un tableau 2D de shape (n_queries, dim).
+            Pour une seule requête : shape (1, 384), pas (384,).
         """
         if self._model is None:
             self.load()
 
-        # np.expand_dims ajoute une dimension : (384,) → (1, 384)
-        # FAISS.search() attend un tableau 2D, pas un vecteur 1D.
+        # On encode une liste avec un seul élément [query].
+        # SentenceTransformer retourne shape (1, 384) dans ce cas.
         vector = self._model.encode(
             [query],
-            convert_to_numpy=True,
-            normalize_embeddings=True,
+            convert_to_numpy     = True,
+            normalize_embeddings = True,  # cohérence avec encode()
         ).astype(np.float32)
 
-        return vector  # shape: (1, 384)
+        return vector  # shape: (1, 384) — directement utilisable par FAISS
