@@ -79,6 +79,27 @@ class Regulation(str, Enum):
     DATA_GOVERNANCE  = "DATA_GOVERNANCE_ACT"
 
 
+class SegmentType(str, Enum):
+    """
+    Type de segment juridique dans le corpus.
+
+    Permet de restreindre la recherche à un type de texte précis :
+    - ARTICLE  : texte normatif officiel (obligations, droits, interdictions)
+    - RECITAL  : considérant interprétatif (contexte, intentions du législateur)
+    - ANNEX    : annexe technique (listes, critères, formulaires)
+    - FREETEXT : texte libre sans structure article (guidelines CNIL, EDPB)
+
+    EXEMPLE D'USAGE :
+    Un juriste qui veut uniquement les obligations légales formelles
+    utilisera segment_type=ARTICLE pour exclure les recitals interprétatifs.
+    Un analyste cherchant le contexte législatif utilisera RECITAL.
+    """
+    ARTICLE  = "article"
+    RECITAL  = "recital"
+    ANNEX    = "annex"
+    FREETEXT = "freetext"
+
+
 class ResponseLanguage(str, Enum):
     """
     Langue dans laquelle le LLM doit synthétiser sa réponse.
@@ -142,6 +163,42 @@ class SearchRequest(BaseModel):
             "Restreindre la recherche à une seule réglementation. "
             "None = cherche dans tout le corpus (GDPR + EU AI Act + CNIL + EDPB + DGA). "
             "Valeurs acceptées : GDPR, EU_AI_ACT, CNIL, EDPB, DATA_GOVERNANCE_ACT"
+        ),
+    )
+
+    segment_type: Optional[SegmentType] = Field(
+        default=None,
+        description=(
+            "Restreindre la recherche à un type de segment juridique. "
+            "None = cherche dans tous les types. "
+            "ARTICLE = texte normatif officiel uniquement. "
+            "RECITAL = considérants interprétatifs uniquement. "
+            "ANNEX = annexes techniques. "
+            "FREETEXT = guidelines sans structure article (CNIL, EDPB)."
+        ),
+    )
+
+    article_number: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=999,
+        description=(
+            "Restreindre la recherche à un numéro d'article précis. "
+            "None = pas de filtre par numéro. "
+            "Ex: article_number=5 → retourne uniquement les chunks de l'Article 5. "
+            "À combiner avec regulation pour un résultat précis : "
+            "regulation=GDPR + article_number=5 = Article 5 GDPR uniquement."
+        ),
+    )
+
+    language_filter: Optional[str] = Field(
+        default=None,
+        description=(
+            "Restreindre la recherche aux chunks d'une langue source précise. "
+            "None = cherche dans toutes les langues du corpus (EN + FR). "
+            "Valeurs acceptées : 'en' (anglais), 'fr' (français). "
+            "Exemple : language_filter='fr' retourne uniquement les chunks "
+            "issus du RGPD FR, des recommandations CNIL en français, etc."
         ),
     )
 

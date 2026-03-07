@@ -276,6 +276,9 @@ class VectorStore:
         query_vector: np.ndarray,
         k: int = 10,
         regulation_filter: str | None = None,
+        segment_type_filter: str | None = None,
+        article_number_filter: int | None = None,
+        language_filter: str | None = None,
         min_score: float = MIN_SCORE,
     ) -> list[dict]:
         """
@@ -317,10 +320,13 @@ class VectorStore:
         - Si FAISS manque de candidats, les cases restantes valent -1 (indice invalide)
 
         Paramètres :
-            query_vector      : vecteur de la question, shape (1, 384), normalisé L2
-            k                 : nombre de résultats souhaités après tous les filtres
-            regulation_filter : "GDPR" / "EU_AI_ACT" / "CNIL" / None (= pas de filtre)
-            min_score         : score minimum de cosine similarity (défaut : 0.35)
+            query_vector          : vecteur de la question, shape (1, 384), normalisé L2
+            k                     : nombre de résultats souhaités après tous les filtres
+            regulation_filter     : "GDPR" / "EU_AI_ACT" / "CNIL" / None (= pas de filtre)
+            segment_type_filter   : "article" / "recital" / "annex" / "freetext" / None
+            article_number_filter : entier (ex: 5 → Article 5 uniquement) / None
+            language_filter       : "en" / "fr" / None (= toutes les langues)
+            min_score             : score minimum de cosine similarity (défaut : 0.35)
 
         Retourne :
             list[dict] : chunks pertinents avec leurs métadonnées + similarity_score
@@ -369,6 +375,34 @@ class VectorStore:
             # ── Filtre par réglementation ─────────────────────────────────────
             # Si un filtre est spécifié, on ignore les chunks d'autres réglementations
             if regulation_filter and chunk.get("regulation") != regulation_filter:
+                continue
+
+            # ── Filtre par type de segment ────────────────────────────────────
+            # Ex: segment_type_filter="article" → ignore recitals, annexes, freetext
+            if segment_type_filter and chunk.get("segment_type") != segment_type_filter:
+                continue
+
+            # ── Filtre par numéro d'article ───────────────────────────────────
+            # On vérifie si le segment_id contient le numéro d'article cherché.
+            # Ex: article_number_filter=5, segment_id="GDPR_ART_5" → match
+            #     article_number_filter=5, segment_id="GDPR_ART_15" → no match
+            # On cherche "_5_" ou "_5" en fin de segment_id pour éviter les
+            # faux positifs (ART_15 ne doit pas matcher article_number=1).
+            if article_number_filter is not None:
+                seg_id = chunk.get("segment_id", "")
+                # Normalise : retire les underscores et cherche le numéro exact
+                import re as _re
+                if not _re.search(
+                    rf'(?:_|ART|REC|ANNEX)0*{article_number_filter}(?:_|$)',
+                    seg_id,
+                    _re.IGNORECASE
+                ):
+                    continue
+
+            # ── Filtre par langue source ──────────────────────────────────────
+            # Filtre sur le champ "language" des métadonnées du chunk.
+            # Ex: language_filter="fr" → retourne uniquement les chunks FR
+            if language_filter and chunk.get("language", "").lower() != language_filter.lower():
                 continue
 
             # ── Déduplication par segment_id ─────────────────────────────────

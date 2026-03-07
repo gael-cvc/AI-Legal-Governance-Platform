@@ -522,10 +522,13 @@ async def search(request: SearchRequest) -> SearchResponse:
     query_vector = embedder.encode_query(search_query)
 
     raw_chunks = store.search(
-        query_vector      = query_vector,
-        k                 = search_k,
-        regulation_filter = request.regulation.value if request.regulation else None,
-        min_score         = request.min_score,
+        query_vector          = query_vector,
+        k                     = search_k,
+        regulation_filter     = request.regulation.value if request.regulation else None,
+        segment_type_filter   = request.segment_type.value if request.segment_type else None,
+        article_number_filter = request.article_number,
+        language_filter       = request.language_filter,
+        min_score             = request.min_score,
     )
 
     n_retrieved = len(raw_chunks)
