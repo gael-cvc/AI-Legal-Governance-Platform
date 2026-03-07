@@ -120,10 +120,14 @@ class LegalEmbedder:
         t0 = time.perf_counter()
 
         # SentenceTransformer() télécharge (si nécessaire) et charge le modèle.
-        # device="cpu" : on force le CPU — pas de GPU requis pour ce projet.
-        # Sur Mac M1/M2, device="mps" accélérerait l'encodage grâce au Neural Engine,
-        # mais device="cpu" est universel et suffisant pour 2016 chunks.
-        self._model = SentenceTransformer(self.model_name, device="cpu")
+        # device="mps" : Metal Performance Shaders — le GPU intégré d'Apple Silicon.
+        # Sur Mac M4 (et M1/M2/M3), PyTorch 2.x a des bugs connus avec device="cpu"
+        # lors d'encodages dans un contexte async (FastAPI uvicorn) : crash Python
+        # sans stacktrace, causé par une interaction entre le thread pool de PyTorch
+        # et le runtime multiprocessing d'uvicorn --reload.
+        # MPS contourne ce bug et est plus rapide (Neural Engine d'Apple Silicon).
+        # Sur Linux/Windows sans GPU Apple : remplacer par device="cpu".
+        self._model = SentenceTransformer(self.model_name, device="mps")
 
         elapsed = time.perf_counter() - t0
         logger.info(
@@ -248,6 +252,10 @@ class LegalEmbedder:
             [query],
             convert_to_numpy     = True,
             normalize_embeddings = True,  # cohérence avec encode()
+            show_progress_bar    = False, # désactivé : évite le crash sur Mac M1/M2/M4
+                                          # la barre de progression tqdm interagit mal
+                                          # avec le runtime Python sur Apple Silicon
+                                          # lors d'encodages de séquences courtes
         ).astype(np.float32)
 
         return vector  # shape: (1, 384) — directement utilisable par FAISS
