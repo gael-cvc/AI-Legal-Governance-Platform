@@ -54,6 +54,12 @@ PIPELINE COMPLET D'UNE REQUÊTE /search :
        │
        ▼
   Réponse JSON structurée (SearchResponse)
+
+CHANGEMENT v1.1 — RERANKER SINGLETON :
+  Avant : CrossEncoder() était instancié DANS rerank_chunks() à chaque requête.
+          → chargement du modèle (~1s) + allocation mémoire répétée → crash Mac M4
+  Après : LegalReranker est chargé UNE SEULE FOIS au démarrage dans main.py lifespan.
+          rerank_chunks() reçoit l'instance en paramètre → aucun rechargement.
 """
 
 from __future__ import annotations
@@ -97,7 +103,6 @@ router = APIRouter()
 # des chunks qui contiennent réellement ces termes juridiques précis.
 #
 # RÉSULTAT MESURÉ : amélioration des scores de similarité de ~10-15%.
-# Query 2 (high-risk AI) : 0.72 → ~0.81 avec expansion.
 
 QUERY_EXPANSIONS: dict[str, str] = {
     # ── GDPR : principes fondamentaux ─────────────────────────────────────────
@@ -203,31 +208,24 @@ def expand_query(question: str) -> tuple[str, bool]:
     Enrichit la question de l'utilisateur avec des termes juridiques spécifiques.
 
     ALGORITHME :
-    1. On convertit la question en minuscules pour la comparaison (insensible à la casse)
+    1. On convertit la question en minuscules (comparaison insensible à la casse)
     2. On itère sur chaque mot-clé du dictionnaire QUERY_EXPANSIONS
     3. Si le mot-clé est trouvé dans la question, on ajoute le texte d'expansion
     4. Plusieurs mots-clés peuvent matcher → leurs expansions s'accumulent
     5. On retourne la question enrichie + un bool indiquant si une expansion a eu lieu
 
-    EXEMPLE CONCRET :
+    EXEMPLE :
     Question : "What are the obligations for data minimisation under GDPR?"
-    Mots-clés matchés : "data minimisation" (trouvé dans la question)
-    Expansion ajoutée : "data minimisation Article 5(1)(c) GDPR personal data..."
-    Résultat : "What are the obligations for data minimisation under GDPR?
-                data minimisation Article 5(1)(c) GDPR personal data adequate
-                relevant limited necessary purpose collection"
-
-    Le résultat est concaténé avec un espace — FAISS traite la question
-    expansée comme une seule chaîne de texte à encoder en vecteur.
+    Match     : "data minimisation"
+    Résultat  : question originale + "data minimisation Article 5(1)(c) GDPR..."
 
     LIMITES CONNUES :
     - Le dictionnaire est manuel → ne couvre pas tous les termes possibles
-    - Plusieurs matchs peuvent allonger beaucoup la question → vecteur "dilué"
     - Solution future : expansion basée sur un modèle (BM25, graph de concepts)
 
     Retourne : (question_expansée, a_été_expansée)
     """
-    question_lower  = question.lower()
+    question_lower   = question.lower()
     expansions_found: list[str] = []
 
     for keyword, expansion_text in QUERY_EXPANSIONS.items():
@@ -238,9 +236,7 @@ def expand_query(question: str) -> tuple[str, bool]:
     if not expansions_found:
         return question, False
 
-    # On concatène : question originale + toutes les expansions matchées
     expanded = question + " " + " ".join(expansions_found)
-
     logger.info(f"Query expansion : {len(expansions_found)} terme(s) ajouté(s)")
     return expanded, True
 
@@ -249,80 +245,49 @@ def expand_query(question: str) -> tuple[str, bool]:
 # ÉTAPE 3 : RERANKING
 # ══════════════════════════════════════════════════════════════════════════════
 
-def rerank_chunks(question: str, chunks: list[dict], top_k: int = 5) -> list[dict]:
+def rerank_chunks(
+    question: str,
+    chunks: list[dict],
+    top_k: int,
+    reranker,  # instance LegalReranker passée depuis le endpoint
+) -> list[dict]:
     """
-    Re-score et réordonne les chunks par pertinence avec un cross-encoder.
+    Re-score et réordonne les chunks avec le cross-encoder singleton.
 
-    POURQUOI LE RERANKING EST NÉCESSAIRE :
+    CHANGEMENT v1.1 PAR RAPPORT À L'ANCIENNE VERSION :
+    Avant : CrossEncoder() était instancié ici à chaque appel → crash Mac M4
+            car PyTorch alloue et libère de la mémoire GPU/CPU à chaque fois.
+    Après : on reçoit l'instance `reranker` déjà chargée depuis main.py.
+            L'allocation mémoire se fait UNE SEULE FOIS au démarrage.
 
-    Le modèle d'embedding (bi-encoder) fonctionne en deux temps séparés :
-      1. Encode la question → vecteur Q (384 dimensions)
-      2. Encode chaque chunk → vecteur C (384 dimensions) — fait à l'index build
-      3. Compare Q et C par produit scalaire
+    DÉLÉGATION À LegalReranker.rerank() :
+    Toute la logique de scoring est dans rag/reranker.py.
+    Cette fonction est un simple wrapper qui :
+    1. Vérifie si le reranker est disponible
+    2. Délègue à reranker.rerank()
+    3. Applique le fallback ordre FAISS si nécessaire
 
-    Le problème : Q et C sont encodés INDÉPENDAMMENT l'un de l'autre.
-    Le modèle ne voit jamais les deux textes ensemble. Il compresse chaque
-    texte en 384 nombres, perdant nécessairement de l'information fine.
+    POURQUOI LA QUESTION ORIGINALE (PAS L'EXPANSÉE) POUR LE RERANKING ?
+    L'expansion sert à guider le vecteur FAISS vers les bons chunks.
+    Le cross-encoder lit les textes directement — lui passer la question
+    concise est plus efficace car il cherche des correspondances directes.
 
-    Le cross-encoder résout ça :
-      1. Reçoit [question + chunk] comme une seule séquence de tokens
-      2. Calcule un score de pertinence en voyant les DEUX textes ensemble
-      3. Peut repérer des correspondances subtiles (synonymes, coreférences...)
+    Paramètres :
+        question : question originale (non expansée)
+        chunks   : candidats FAISS à re-scorer
+        top_k    : nombre de chunks à retourner
+        reranker : instance LegalReranker (peut être None si chargement échoué)
 
-    ANALOGIE :
-    Bi-encoder = résumés séparés de deux textes + comparaison des résumés
-    Cross-encoder = lecture des deux textes côte à côte + jugement direct
-
-    POURQUOI NE PAS UTILISER LE CROSS-ENCODER SEUL ?
-    Le cross-encoder est O(n) : il doit lire chaque chunk du corpus.
-    Avec 2016 chunks, ça prendrait ~30 secondes par requête — inacceptable.
-    FAISS + cross-encoder = "retrieve and rerank" :
-      - FAISS filtre les 2016 chunks → 10 candidats en ~2ms
-      - Cross-encoder juge les 10 candidats → 5 finaux en ~100ms
-
-    MODÈLE UTILISÉ : cross-encoder/ms-marco-MiniLM-L-6-v2
-    - Entraîné sur MS-MARCO (340k paires question/passage de Bing Search)
-    - Architecture MiniLM → rapide sur CPU (pas besoin de GPU)
-    - Retourne des logits non normalisés (peuvent être négatifs)
-    - Score élevé = très pertinent, score bas/négatif = peu pertinent
-
-    GESTION D'ERREUR :
-    Si le cross-encoder ne peut pas se charger (réseau coupé lors du premier
-    téléchargement, mémoire insuffisante...), on retourne les chunks dans leur
-    ordre FAISS original plutôt que de faire échouer toute la requête.
-    L'API reste fonctionnelle, mais sans l'amélioration du reranking.
+    Retourne :
+        list[dict] rerankés par score décroissant, ou ordre FAISS si fallback
     """
-    try:
-        from sentence_transformers import CrossEncoder
-
-        # Chargement du modèle (téléchargé depuis HuggingFace au premier appel,
-        # puis mis en cache dans ~/.cache/huggingface/)
-        model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
-
-        # Construit les paires (question, texte_du_chunk) pour le cross-encoder.
-        # Le modèle attend exactement ce format : liste de tuples (str, str).
-        pairs = [(question, chunk["text"]) for chunk in chunks]
-
-        # predict() retourne un numpy array de scores, un par paire.
-        # Chaque appel encode et score toutes les paires en batch → efficace.
-        scores = model.predict(pairs)
-
-        # Ajoute le rerank_score à chaque chunk et trie par score décroissant
-        for chunk, score in zip(chunks, scores):
-            chunk["rerank_score"] = float(score)
-
-        reranked = sorted(chunks, key=lambda c: c["rerank_score"], reverse=True)
-
-        logger.info(
-            f"Reranking : top score={reranked[0]['rerank_score']:.3f} | "
-            f"bottom score={reranked[-1]['rerank_score']:.3f}"
-        )
-        return reranked[:top_k]
-
-    except Exception as e:
-        # Fallback gracieux : on garde les chunks dans l'ordre FAISS
-        logger.warning(f"Reranking désactivé (erreur : {e}). Fallback ordre FAISS.")
+    if reranker is None or not reranker.is_available:
+        # Reranker non disponible → fallback ordre FAISS
+        logger.warning("Reranker non disponible → fallback ordre FAISS")
         return chunks[:top_k]
+
+    # Délègue à LegalReranker.rerank() — gère lui-même les erreurs et fallbacks
+    return reranker.rerank(question=question, chunks=chunks, top_k=top_k)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -339,41 +304,26 @@ def build_prompt(question: str, chunks: list[dict], language: str = "fr") -> str
     - On veut qu'il réponde UNIQUEMENT depuis les sources fournies
 
     Pour forcer cette contrainte, on :
-    1. Donne les sources en premier (avant la question) → le LLM les "voit"
-       comme le contexte principal, pas comme un complément optionnel
-    2. Utilise des instructions explicites et répétées ("EXCLUSIVEMENT",
-       "UNIQUEMENT", "RÈGLES ABSOLUES") → réduit les hallucinations
+    1. Donne les sources en premier (avant la question)
+    2. Utilise des instructions explicites ("EXCLUSIVEMENT", "RÈGLES ABSOLUES")
     3. Demande des citations obligatoires [SOURCE X] → traçabilité totale
     4. Demande de signaler si les sources sont insuffisantes → honnêteté
 
     NUMÉROTATION DES SOURCES :
     Chaque source est préfixée [SOURCE 1], [SOURCE 2]... Le LLM est instruit
-    de citer avec ce numéro dans sa réponse. L'endpoint /search extrait
-    ensuite ces citations pour les inclure séparément dans le JSON de réponse.
-
-    FORMAT DES SOURCES :
-    [SOURCE 1] GDPR (2016) — GDPR_ART_5
-    Texte exact de l'article...
-
-    Le segment_id (ex: GDPR_ART_5) permet à l'utilisateur de retrouver
-    le passage exact dans le document officiel si besoin.
+    de citer avec ce numéro dans sa réponse.
 
     LANGUE :
-    Le prompt change de langue selon request.language, mais les chunks
-    sources restent en anglais (leur langue d'origine). Claude gère
-    très bien le mélange : comprendre des sources anglaises et répondre
-    en français.
+    Le prompt change selon request.language, mais les chunks restent en anglais.
+    Claude gère très bien : comprendre des sources anglaises et répondre en français.
     """
-    # Formate chaque chunk avec sa source pour que le LLM puisse citer précisément
     context_parts = []
     for i, chunk in enumerate(chunks, 1):
-        reg     = chunk.get("regulation", "?")
-        seg_id  = chunk.get("segment_id", "?")
-        year    = chunk.get("year", "?")
-        text    = chunk.get("text", "")
-        context_parts.append(
-            f"[SOURCE {i}] {reg} ({year}) — {seg_id}\n{text}"
-        )
+        reg    = chunk.get("regulation", "?")
+        seg_id = chunk.get("segment_id", "?")
+        year   = chunk.get("year", "?")
+        text   = chunk.get("text", "")
+        context_parts.append(f"[SOURCE {i}] {reg} ({year}) — {seg_id}\n{text}")
 
     context = "\n\n---\n\n".join(context_parts)
 
@@ -423,74 +373,49 @@ async def generate_answer(
 
     POURQUOI async ?
     L'appel à l'API Anthropic est une opération I/O (réseau).
-    En Python async, pendant qu'on attend la réponse d'Anthropic,
+    En Python async, pendant qu'on attend la réponse d'Anthropic (~2-3s),
     FastAPI peut traiter d'autres requêtes entrantes en parallèle.
-    Sans async, le serveur serait bloqué à attendre Claude pendant ~2-3s.
-
-    Note : la librairie `anthropic` Python est synchrone. Pour l'utiliser
-    dans un contexte async sans bloquer l'event loop, il faudrait utiliser
-    asyncio.run_in_executor(). Ici on fait l'appel directement — acceptable
-    pour un projet portfolio/prototype mais à corriger en production
-    (utiliser `anthropic.AsyncAnthropic` à la place).
-
-    PARSING DES CITATIONS :
-    On extrait les citations depuis la réponse générée par Claude.
-    Le LLM est instruit de citer sous la forme [SOURCE X] et
-    "RÈGLEMENT Article Y (Année)". On cherche ces patterns avec une regex
-    pour construire la liste `citations` du SearchResponse.
 
     FALLBACK SANS LLM :
-    Si ANTHROPIC_API_KEY n'est pas configurée (ou si l'API est down),
-    on génère une réponse de fallback qui liste les chunks avec leurs scores.
-    Avantages :
-    - L'API reste 100% fonctionnelle pour tester la recherche vectorielle
-      sans avoir besoin d'une clé API Anthropic
-    - Le développeur peut valider la qualité des chunks avant d'activer le LLM
+    Si ANTHROPIC_API_KEY n'est pas configurée ou si l'API est down,
+    on génère une réponse structurée qui liste les chunks avec leurs scores.
+    L'API reste 100% fonctionnelle pour valider la recherche vectorielle.
 
     Retourne : (texte_réponse, liste_citations, modèle_utilisé)
     """
     import os
-
-    model_id   = "claude-sonnet-4-20250514"
-    api_key    = os.getenv("ANTHROPIC_API_KEY")
+    model_id = "claude-sonnet-4-20250514"
+    api_key  = os.getenv("ANTHROPIC_API_KEY")
 
     try:
         if not api_key:
-            raise ValueError(
-                "ANTHROPIC_API_KEY absente du .env — mode fallback activé"
-            )
+            raise ValueError("ANTHROPIC_API_KEY absente du .env — mode fallback activé")
 
         import anthropic
-
         client = anthropic.Anthropic(api_key=api_key)
         prompt = build_prompt(question, chunks, language)
 
         # Appel synchrone à l'API Anthropic.
-        # max_tokens=2000 : suffisant pour une réponse juridique détaillée
-        # avec citations (~800-1200 tokens en pratique).
+        # max_tokens=2000 : suffisant pour une réponse juridique détaillée.
         message = client.messages.create(
             model      = model_id,
             max_tokens = 2000,
             messages   = [{"role": "user", "content": prompt}],
         )
-
         answer = message.content[0].text
 
-        # ── Extraction des citations ───────────────────────────────────────────
-        # On cherche deux patterns dans la réponse :
-        # 1. [SOURCE X]       → références numériques inline dans le texte
+        # ── Extraction des citations depuis la réponse ─────────────────────────
+        # On cherche deux patterns :
+        # 1. [SOURCE X]          → références numériques inline
         # 2. GDPR Article 5 (2016) → citations formelles en fin de réponse
-        #    Pattern : MOT_MAJ SPACE (Article|Recital|Section) SPACE CHIFFRE(S)
-        #              éventuellement (a), (1)(c)... suivi de l'année entre ()
         import re
         citation_pattern = (
-            r'\[SOURCE \d+\]'                             # ex: [SOURCE 2]
-            r'|[A-Z_]+\s+(?:Article|Recital|Section)\s+' # ex: GDPR Article
-            r'\d+(?:\(\d+\))?(?:\([a-z]\))?\s*\(\d{4}\)' # ex: 5(1)(c) (2016)
+            r'\[SOURCE \d+\]'
+            r'|[A-Z_]+\s+(?:Article|Recital|Section)\s+'
+            r'\d+(?:\(\d+\))?(?:\([a-z]\))?\s*\(\d{4}\)'
         )
-        raw   = re.findall(citation_pattern, answer)
-        # dict.fromkeys préserve l'ordre d'apparition tout en déduplication
-        citations = list(dict.fromkeys(raw))
+        raw       = re.findall(citation_pattern, answer)
+        citations = list(dict.fromkeys(raw))  # déduplique en préservant l'ordre
 
     except Exception as e:
         logger.warning(f"Génération LLM échouée : {e}")
@@ -511,19 +436,17 @@ async def generate_answer(
                 f"Set `ANTHROPIC_API_KEY` in `.env` for intelligent synthesis.\n\n"
             )
 
-        # Liste les chunks avec un extrait et leurs scores
         source_lines = []
         for c in chunks:
             score_info = f"score FAISS: {c.get('similarity_score', 0):.3f}"
             if c.get("rerank_score") is not None:
                 score_info += f" | rerank: {c.get('rerank_score'):.3f}"
-
             source_lines.append(
                 f"**{c.get('regulation')} — {c.get('segment_id')}** ({score_info})\n"
                 f"{c.get('text', '')[:400]}..."
             )
 
-        answer = header + "\n\n".join(source_lines)
+        answer    = header + "\n\n".join(source_lines)
         citations = [
             f"{c.get('regulation')} {c.get('segment_id')} ({c.get('year')})"
             for c in chunks
@@ -554,23 +477,21 @@ async def search(request: SearchRequest) -> SearchResponse:
 
     GESTION DES ERREURS :
     - 503 : index FAISS non chargé (lancer build_index.py d'abord)
-    - 404 : aucun chunk ne dépasse le min_score (question hors corpus ou trop vague)
-    - 422 : validation Pydantic échouée (mauvais type, contrainte violée) — auto FastAPI
+    - 404 : aucun chunk ne dépasse le min_score
+    - 422 : validation Pydantic échouée — auto FastAPI
 
     STRATÉGIE k*2 :
-    On demande à FAISS le double de chunks nécessaires (k*2).
-    Exemple : si k=5, on récupère 10 chunks de FAISS, le cross-encoder les
-    reranke, et on garde les 5 meilleurs. Sans ça, le cross-encoder n'aurait
-    pas de "marge de manœuvre" pour réordonner — si FAISS retourne exactement
-    5 chunks, le reranking ne peut pas améliorer l'ordre de manière significative.
-    Cette stratégie est standard dans les architectures "retrieve and rerank".
+    On demande à FAISS le double de chunks nécessaires (k*2) pour donner
+    au cross-encoder assez de candidats à reordonner.
+    Ex: k=5 → FAISS retourne 10 → cross-encoder garde les 5 meilleurs.
     """
-    from .main import get_embedder, get_vector_store
+    # Récupère les singletons chargés au démarrage
+    from .main import get_embedder, get_reranker, get_vector_store
 
-    t_start = time.perf_counter()
-
+    t_start  = time.perf_counter()
     store    = get_vector_store()
     embedder = get_embedder()
+    reranker = get_reranker()  # peut être None si chargement échoué
 
     # ── Vérification de l'état du service ─────────────────────────────────────
     if store is None or store.n_vectors == 0:
@@ -595,14 +516,11 @@ async def search(request: SearchRequest) -> SearchResponse:
     )
 
     # ── ÉTAPE 2 : Recherche vectorielle FAISS ─────────────────────────────────
-    # On cherche k*2 candidats pour que le cross-encoder ait de la marge.
-    # Si reranking désactivé → on cherche exactement k (pas de marge nécessaire).
+    # k*2 candidats si reranking activé → marge pour le cross-encoder
+    # k candidats si reranking désactivé → pas de marge nécessaire
     search_k     = request.k * 2 if request.use_reranking else request.k
     query_vector = embedder.encode_query(search_query)
 
-    # regulation_filter : si fourni, on ne cherche que dans les chunks
-    # dont le champ "regulation" correspond exactement à la valeur de l'enum.
-    # Ce filtre est appliqué DANS vector_store.search(), pas ici.
     raw_chunks = store.search(
         query_vector      = query_vector,
         k                 = search_k,
@@ -618,22 +536,18 @@ async def search(request: SearchRequest) -> SearchResponse:
             status_code=404,
             detail=(
                 f"Aucun résultat avec score ≥ {request.min_score}. "
-                f"Essayez de reformuler la question ou de baisser min_score "
-                f"(actuellement {request.min_score})."
+                f"Essayez de reformuler la question ou de baisser min_score."
             ),
         )
 
     # ── ÉTAPE 3 : Reranking ───────────────────────────────────────────────────
     if request.use_reranking and len(raw_chunks) > 1:
         final_chunks = rerank_chunks(
-            question = request.question,  # question ORIGINALE (non expansée)
+            question = request.question,  # question originale, pas l'expansée
             chunks   = raw_chunks,
             top_k    = request.k,
+            reranker = reranker,          # singleton chargé au démarrage
         )
-        # Pourquoi la question originale (pas l'expansée) pour le reranking ?
-        # L'expansion sert à guider le vecteur FAISS. Le cross-encoder lit
-        # les textes directement — lui passer la question originale et concise
-        # est plus naturel et évite de "noyer" le signal avec les termes d'expansion.
     else:
         final_chunks = raw_chunks[:request.k]
 
@@ -649,7 +563,6 @@ async def search(request: SearchRequest) -> SearchResponse:
     # ── Construction de la réponse structurée ────────────────────────────────
     elapsed_ms = (time.perf_counter() - t_start) * 1000
 
-    # Conversion des dicts internes en objets Pydantic ChunkResult
     sources = [
         ChunkResult(
             segment_id       = c.get("segment_id", ""),
@@ -669,7 +582,7 @@ async def search(request: SearchRequest) -> SearchResponse:
 
     logger.info(
         f"[DONE] {elapsed_ms:.0f}ms — "
-        f"FAISS: {n_retrieved} chunks → reranking → LLM: {n_used} chunks utilisés"
+        f"FAISS: {n_retrieved} → reranking → LLM: {n_used} chunks utilisés"
     )
 
     return SearchResponse(
@@ -703,15 +616,9 @@ async def get_suggestions(regulation: Optional[Regulation] = None) -> Suggestion
     Fournit des questions d'exemple prêtes à l'emploi.
 
     UTILISATION FRONTEND :
-    Le frontend appelle cet endpoint au chargement de la page pour afficher
-    des boutons "Questions suggérées". Quand l'utilisateur clique sur une
-    suggestion, elle est pré-remplie dans le champ de recherche.
-    Améliore l'UX en guidant les utilisateurs qui ne savent pas quoi demander
-    (juristes non-techniciens, consultants...).
-
-    Ces questions sont calibrées pour obtenir des résultats pertinents
-    avec notre corpus — elles couvrent les articles les plus consultés
-    de chaque réglementation.
+    Le frontend appelle cet endpoint au chargement pour afficher des boutons
+    "Questions suggérées". Quand l'utilisateur clique, la question est
+    pré-remplie dans le champ de recherche.
     """
     suggestions_by_regulation: dict[str, list[str]] = {
         "GDPR": [
