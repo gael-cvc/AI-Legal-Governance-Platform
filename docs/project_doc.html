@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Legal Governance Platform — Documentation Technique</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700;900&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0a; --bg2: #111111; --bg3: #1a1a1a; --bg4: #222222;
+  --border: #2a2a2a; --border2: #333333;
+  --gold: #c9a84c; --gold2: #e8c97a; --gold3: #f5e0a0;
+  --red: #e05555; --green: #4caf7d; --blue: #5598e0;
+  --purple: #9b6ee0; --orange: #e07c3a;
+  --text: #e8e8e8; --text-mid: #999999; --text-dim: #555555;
+  --mono: 'IBM Plex Mono', monospace;
+  --serif: 'Playfair Display', serif;
+  --sans: 'IBM Plex Sans', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body { background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.7; overflow-x:hidden; }
+body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E"); pointer-events:none; z-index:1000; opacity:0.4; }
+
+.sidebar { position:fixed; left:0; top:0; bottom:0; width:260px; background:var(--bg2); border-right:1px solid var(--border); padding:40px 0; overflow-y:auto; z-index:100; }
+.sidebar-logo { padding:0 28px 32px; border-bottom:1px solid var(--border); margin-bottom:24px; }
+.sidebar-logo .logo-tag { font-family:var(--mono); font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--gold); margin-bottom:8px; }
+.sidebar-logo h2 { font-family:var(--serif); font-size:18px; font-weight:700; color:#fff; line-height:1.3; }
+.nav-section { padding:0 28px; margin-bottom:24px; }
+.nav-section-title { font-family:var(--mono); font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--text-dim); margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+.nav-item { display:block; padding:6px 0; font-family:var(--mono); font-size:11px; color:var(--text-mid); text-decoration:none; transition:color 0.2s; }
+.nav-item:hover { color:var(--gold); }
+.nav-item::before { content:'›'; margin-right:8px; color:var(--text-dim); }
+
+.main { margin-left:260px; padding:0; }
+
+.hero { padding:80px 80px 60px; border-bottom:1px solid var(--border); position:relative; overflow:hidden; }
+.hero::after { content:'RAG'; position:absolute; right:-10px; top:-10px; font-family:var(--serif); font-size:180px; font-weight:900; color:var(--gold); opacity:0.03; line-height:1; pointer-events:none; }
+.hero-tag { font-family:var(--mono); font-size:10px; letter-spacing:4px; text-transform:uppercase; color:var(--gold); margin-bottom:20px; display:flex; align-items:center; gap:12px; }
+.hero-tag::before { content:''; width:32px; height:1px; background:var(--gold); }
+.hero h1 { font-family:var(--serif); font-size:clamp(32px,4vw,52px); font-weight:900; line-height:1.1; color:#fff; margin-bottom:16px; }
+.hero h1 span { color:var(--gold2); }
+.hero-sub { font-size:15px; color:var(--text-mid); max-width:640px; line-height:1.7; }
+.hero-meta { display:flex; gap:32px; margin-top:40px; padding-top:32px; border-top:1px solid var(--border); flex-wrap:wrap; }
+.hero-meta-item { font-family:var(--mono); font-size:11px; color:var(--text-dim); }
+.hero-meta-item strong { display:block; font-size:20px; color:var(--gold2); margin-bottom:2px; }
+
+.section { padding:64px 80px; border-bottom:1px solid var(--border); }
+.section-header { display:flex; align-items:flex-start; gap:24px; margin-bottom:40px; }
+.section-number { font-family:var(--mono); font-size:11px; color:var(--gold); border:1px solid rgba(201,168,76,0.3); padding:4px 10px; white-space:nowrap; margin-top:6px; }
+.section-title-block h2 { font-family:var(--serif); font-size:28px; font-weight:700; color:#fff; margin-bottom:6px; }
+.section-title-block p { font-family:var(--mono); font-size:11px; color:var(--text-dim); letter-spacing:1px; }
+
+.code-block { background:var(--bg3); border:1px solid var(--border2); border-left:3px solid var(--gold); margin:16px 0; overflow-x:auto; }
+.code-header { background:var(--bg4); padding:8px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); }
+.code-label { font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--gold); }
+.code-dots { display:flex; gap:6px; }
+.code-dot { width:8px; height:8px; border-radius:50%; }
+.code-dot.red { background:#ff5f57; } .code-dot.yellow { background:#febc2e; } .code-dot.green { background:#28c840; }
+pre { padding:20px 24px; font-family:var(--mono); font-size:12px; line-height:1.8; color:var(--text); white-space:pre; overflow-x:auto; }
+.c-comment { color:var(--text-dim); font-style:italic; }
+.c-cmd { color:var(--gold2); font-weight:600; }
+.c-flag { color:var(--blue); }
+.c-string { color:var(--green); }
+.c-path { color:var(--orange); }
+.c-output { color:var(--text-mid); }
+.c-ok { color:var(--green); font-weight:600; }
+.c-warn { color:var(--orange); }
+.c-err { color:var(--red); }
+.c-num { color:var(--purple); }
+
+.callout { padding:20px 24px; margin:20px 0; border-left:3px solid; background:var(--bg2); }
+.callout.tip    { border-color:var(--green);  background:rgba(76,175,125,0.05); }
+.callout.warning{ border-color:var(--orange); background:rgba(224,124,58,0.05); }
+.callout.danger { border-color:var(--red);    background:rgba(224,85,85,0.05); }
+.callout.info   { border-color:var(--blue);   background:rgba(85,152,224,0.05); }
+.callout.gold   { border-color:var(--gold);   background:rgba(201,168,76,0.05); }
+.callout-title { font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; margin-bottom:8px; font-weight:600; }
+.callout.tip    .callout-title { color:var(--green); }
+.callout.warning .callout-title { color:var(--orange); }
+.callout.danger  .callout-title { color:var(--red); }
+.callout.info   .callout-title { color:var(--blue); }
+.callout.gold   .callout-title { color:var(--gold); }
+.callout p { font-size:13px; color:var(--text-mid); line-height:1.7; }
+.callout p + p { margin-top:8px; }
+.callout code { font-family:var(--mono); font-size:11px; background:var(--bg3); padding:1px 5px; color:var(--gold2); }
+
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:20px 0; }
+.three-col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin:20px 0; }
+.info-card { background:var(--bg2); border:1px solid var(--border); padding:24px; }
+.info-card h4 { font-family:var(--mono); font-size:12px; font-weight:600; color:var(--gold2); margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+.info-card p { font-size:12px; color:var(--text-mid); line-height:1.6; }
+.info-card ul { list-style:none; display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.info-card ul li { font-size:12px; color:var(--text-mid); padding-left:16px; position:relative; line-height:1.5; }
+.info-card ul li::before { content:'›'; position:absolute; left:0; color:var(--gold); }
+.info-card ul li code { font-family:var(--mono); font-size:10px; background:var(--bg3); padding:1px 4px; color:var(--gold2); }
+
+.badge { display:inline-block; font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:2px; text-transform:uppercase; padding:3px 8px; border-radius:2px; margin-right:6px; }
+.badge.green  { background:rgba(76,175,125,0.15);  color:var(--green);  border:1px solid rgba(76,175,125,0.3); }
+.badge.blue   { background:rgba(85,152,224,0.15);  color:var(--blue);   border:1px solid rgba(85,152,224,0.3); }
+.badge.red    { background:rgba(224,85,85,0.15);   color:var(--red);    border:1px solid rgba(224,85,85,0.3); }
+.badge.gold   { background:rgba(201,168,76,0.15);  color:var(--gold2);  border:1px solid rgba(201,168,76,0.3); }
+.badge.purple { background:rgba(155,110,224,0.15); color:var(--purple); border:1px solid rgba(155,110,224,0.3); }
+.badge.orange { background:rgba(224,124,58,0.15);  color:var(--orange); border:1px solid rgba(224,124,58,0.3); }
+
+.ref-table { width:100%; border-collapse:collapse; margin:24px 0; font-size:12px; }
+.ref-table th { background:var(--bg3); font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--gold); padding:12px 16px; text-align:left; border-bottom:2px solid var(--gold); }
+.ref-table td { padding:12px 16px; border-bottom:1px solid var(--border); color:var(--text-mid); vertical-align:top; }
+.ref-table tr:hover td { background:var(--bg2); }
+.ref-table td:first-child { font-family:var(--mono); font-size:11px; color:var(--gold2); white-space:nowrap; }
+
+.flow-steps { display:flex; flex-direction:column; gap:0; margin:24px 0; position:relative; }
+.flow-steps::before { content:''; position:absolute; left:20px; top:40px; bottom:40px; width:1px; background:linear-gradient(to bottom, var(--gold), transparent); }
+.flow-step { display:flex; gap:24px; padding:20px 0; position:relative; }
+.flow-step-num { width:40px; height:40px; background:var(--bg3); border:1px solid var(--gold); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:12px; font-weight:700; color:var(--gold); flex-shrink:0; position:relative; z-index:1; }
+.flow-step-content h4 { font-family:var(--mono); font-size:13px; font-weight:600; color:#fff; margin-bottom:6px; }
+.flow-step-content p { font-size:12px; color:var(--text-mid); line-height:1.6; margin-bottom:8px; }
+
+.result-box { background:var(--bg3); border:1px solid var(--border2); border-left:3px solid var(--green); padding:20px 24px; margin:16px 0; }
+.result-box .result-title { font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--green); margin-bottom:12px; }
+.result-box pre { padding:0; background:none; border:none; }
+
+.decision-box { background:var(--bg2); border:1px solid var(--border); padding:24px; margin:20px 0; position:relative; }
+.decision-box::before { content:'DÉCISION'; position:absolute; top:-1px; left:20px; font-family:var(--mono); font-size:8px; letter-spacing:3px; background:var(--gold); color:#000; padding:2px 8px; font-weight:700; }
+.decision-box h4 { font-family:var(--mono); font-size:13px; color:var(--gold2); margin-bottom:12px; margin-top:8px; }
+.decision-box p { font-size:13px; color:var(--text-mid); line-height:1.7; }
+
+.scale-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:20px 0; }
+.scale-card { background:var(--bg2); border:1px solid var(--border); padding:20px; }
+.scale-card .scale-tag { font-family:var(--mono); font-size:9px; letter-spacing:2px; text-transform:uppercase; margin-bottom:10px; font-weight:700; }
+.scale-card.our  .scale-tag { color:var(--gold); }
+.scale-card.pro  .scale-tag { color:var(--blue); }
+.scale-card.big  .scale-tag { color:var(--purple); }
+.scale-card h5 { font-family:var(--mono); font-size:12px; color:#fff; margin-bottom:8px; }
+.scale-card p { font-size:11px; color:var(--text-mid); line-height:1.6; }
+
+.footer { padding:40px 80px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.footer-left { font-family:var(--mono); font-size:11px; color:var(--text-dim); line-height:1.8; }
+.footer-right { font-family:var(--serif); font-size:13px; color:var(--gold); text-align:right; }
+
+@media (max-width:1100px) {
+  .sidebar { display:none; }
+  .main { margin-left:0; }
+  .hero, .section { padding:40px 32px; }
+  .two-col, .three-col, .scale-grid { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-tag">Documentation Technique</div>
+    <h2>AI Legal<br>Governance<br>Platform</h2>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-title">Vue d'ensemble</div>
+    <a class="nav-item" href="#overview">Architecture & Stack</a>
+    <a class="nav-item" href="#datalake">Data Lake Design</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-title">Pipeline</div>
+    <a class="nav-item" href="#ingestion">Étape 1 — Ingestion</a>
+    <a class="nav-item" href="#embedding">Étape 2 — Embedding & FAISS</a>
+    <a class="nav-item" href="#api">Étape 3 — FastAPI</a>
+    <a class="nav-item" href="#reranker">Étape 4 — Reranker</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-title">Infrastructure</div>
+    <a class="nav-item" href="#git">Git & Versioning</a>
+    <a class="nav-item" href="#bugs">Problèmes & Solutions</a>
+    <a class="nav-item" href="#results">Résultats & Logs</a>
+  </div>
+</nav>
+
+<div class="main">
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-tag">Documentation Technique · v1.0</div>
+  <h1>AI Legal <span>Governance</span><br>Intelligence Platform</h1>
+  <p class="hero-sub">Architecture complète d'un système RAG (Retrieval-Augmented Generation) appliqué au droit européen. Chaque décision technique documentée, justifiée, et mise en perspective selon les contextes d'usage — du prototype au déploiement entreprise.</p>
+  <div class="hero-meta">
+    <div class="hero-meta-item"><strong>4</strong>étapes</div>
+    <div class="hero-meta-item"><strong>2016</strong>vecteurs</div>
+    <div class="hero-meta-item"><strong>8</strong>PDFs légaux</div>
+    <div class="hero-meta-item"><strong>384</strong>dimensions</div>
+    <div class="hero-meta-item"><strong>Claude</strong>Sonnet 4</div>
+  </div>
+</div>
+
+
+<!-- SECTION 1 — ARCHITECTURE OVERVIEW -->
+<section class="section" id="overview">
+  <div class="section-header">
+    <div class="section-number">00</div>
+    <div class="section-title-block">
+      <h2>Architecture & Choix de Stack</h2>
+      <p>Positionnement stratégique · Justification des technologies</p>
+    </div>
+  </div>
+
+  <p style="color:var(--text-mid);margin-bottom:28px;font-size:14px;line-height:1.8;">Avant d'écrire la première ligne de code, nous avons posé une question fondamentale : <strong style="color:#fff">quel est le problème réel ?</strong> Les juristes, compliance officers et DPO passent des heures à naviguer dans des textes réglementaires denses (GDPR, AI Act, DGA). L'objectif est de construire un système capable de répondre à des questions juridiques précises en citant les sources exactes, sans hallucinations.</p>
+
+  <div class="callout gold">
+    <div class="callout-title">Approche Cabinet Conseil</div>
+    <p>Un système RAG (Retrieval-Augmented Generation) est la réponse adaptée : il ne "génère" pas de droit, il <strong>retrouve</strong> les passages pertinents et les présente via un LLM. L'exactitude prime sur la créativité. C'est fondamentalement différent d'un chatbot généraliste.</p>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Stack technique retenue</h3>
+
+  <table class="ref-table">
+    <thead><tr><th>Composant</th><th>Technologie choisie</th><th>Alternative écartée</th><th>Justification</th></tr></thead>
+    <tbody>
+      <tr><td>LLM</td><td><span class="badge gold">Claude Sonnet 4</span></td><td>GPT-4o, Mistral</td><td>Fenêtre de contexte longue, qualité de raisonnement juridique supérieure, API Anthropic stable</td></tr>
+      <tr><td>Embeddings</td><td><span class="badge blue">all-MiniLM-L6-v2</span></td><td>bge-large-en-v1.5, ada-002</td><td>90MB, 139 chunks/sec, local (pas de coût API), suffisant pour 2016 vecteurs</td></tr>
+      <tr><td>Vector store</td><td><span class="badge purple">FAISS IndexFlatIP</span></td><td>Pinecone, Chroma, Weaviate</td><td>Exact search, 0 dépendance cloud, recherche < 5ms sur 2016 vecteurs</td></tr>
+      <tr><td>Reranker</td><td><span class="badge orange">ms-marco-MiniLM-L-6-v2</span></td><td>Cohere Rerank, bge-reranker</td><td>67MB, local, cross-encoder précis, gratuit</td></tr>
+      <tr><td>API</td><td><span class="badge green">FastAPI</span></td><td>Flask, Django REST</td><td>Async natif, OpenAPI auto-généré, type hints, lifespan hooks pour singletons</td></tr>
+      <tr><td>PDF parsing</td><td><span class="badge gold">PyMuPDF</span></td><td>pdfplumber, pypdf2</td><td>Le plus rapide, meilleure extraction sur PDFs légaux EU multi-langues</td></tr>
+      <tr><td>Runtime</td><td><span class="badge blue">Python 3.12 + venv</span></td><td>Docker, conda</td><td>Prototype local, portabilité simple, pas de surcharge infra</td></tr>
+      <tr><td>Accélération</td><td><span class="badge purple">MPS (Apple Silicon)</span></td><td>CPU, CUDA</td><td>Mac M4 — MPS = 3-5x plus rapide que CPU pour sentence-transformers</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Infrastructure par contexte d'usage</h3>
+
+  <div class="scale-grid">
+    <div class="scale-card our">
+      <div class="scale-tag">✦ Notre projet — Prototype</div>
+      <h5>Local · Mac M4 · venv</h5>
+      <p>FAISS local, modèles HuggingFace en cache, FastAPI en développement. Zéro coût cloud. Idéal pour valider le concept et construire le MVP.</p>
+    </div>
+    <div class="scale-card pro">
+      <div class="scale-tag">◈ Cabinet Conseil Pro</div>
+      <h5>Cloud managé · API externe</h5>
+      <p>Pinecone ou Weaviate pour le vector store, Cohere Rerank API, déploiement sur AWS Lambda ou Cloud Run. SLA, monitoring, authentification OAuth2.</p>
+    </div>
+    <div class="scale-card big">
+      <div class="scale-tag">⬡ Large Scale Entreprise</div>
+      <h5>Kubernetes · Multi-tenant</h5>
+      <p>Elasticsearch + dense vector, modèles servis via TorchServe ou Triton, pipeline Kafka pour ingestion temps réel, Grafana/Prometheus pour observabilité.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- SECTION — DATA LAKE -->
+<section class="section" id="datalake">
+  <div class="section-header">
+    <div class="section-number">01</div>
+    <div class="section-title-block">
+      <h2>Data Lake — Architecture 3 Couches</h2>
+      <p>raw → bronze → silver · Conception défensive des données</p>
+    </div>
+  </div>
+
+  <p style="color:var(--text-mid);margin-bottom:28px;">La première décision d'architecture est la plus importante : <strong style="color:#fff">comment organiser les données sources ?</strong> Une erreur ici compromet tout le pipeline. Nous avons adopté le pattern Medallion (raw/bronze/silver) utilisé dans les data engineering modernes.</p>
+
+  <div class="two-col">
+    <div>
+      <div class="code-block">
+        <div class="code-header"><span class="code-label">Structure Data Lake</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+        <pre><span class="c-path">data/</span>
+├── <span class="c-path">raw/</span>          <span class="c-comment"># ⚠ JAMAIS modifié</span>
+│   ├── gdpr_full.pdf
+│   ├── ai_act_full.pdf
+│   ├── ai_act_annexes.pdf
+│   ├── edpb_automated_decision.pdf
+│   ├── cnil_ai_recommendations.pdf
+│   ├── cnil_ai_how_to_comply.pdf
+│   ├── rgpd_full.pdf
+│   └── data_governance_act.pdf
+│
+├── <span class="c-path">bronze/</span>       <span class="c-comment"># segments + metadata</span>
+│   └── *.jsonl           <span class="c-comment"># 1 ligne = 1 segment</span>
+│
+├── <span class="c-path">silver/</span>       <span class="c-comment"># chunks prêts à vectoriser</span>
+│   └── chunks.jsonl      <span class="c-comment"># 2016 lignes</span>
+│
+└── <span class="c-path">vector_store/</span> <span class="c-comment"># index FAISS + mapping</span>
+    ├── legal_index.faiss
+    └── chunks_map.json</pre>
+      </div>
+    </div>
+    <div>
+      <div class="decision-box">
+        <h4>Pourquoi le pattern Medallion ?</h4>
+        <p>La couche <code style="font-family:var(--mono);font-size:11px;color:var(--gold2);background:var(--bg3);padding:1px 4px">raw/</code> est immuable — on ne touche jamais les PDFs originaux. Si le parser change, on re-run depuis raw. Si les chunks changent, on re-run depuis bronze. Chaque couche peut être reconstruite indépendamment.</p>
+      </div>
+      <div class="callout info">
+        <div class="callout-title">JSONL vs JSON</div>
+        <p>On choisit JSONL (une ligne = un objet) plutôt que JSON array pour trois raisons : lecture ligne par ligne sans charger tout en mémoire, compatibilité Spark/pandas/jq, et append atomique sans réécrire tout le fichier.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Documents sources — Corpus légal EU</h3>
+  <table class="ref-table">
+    <thead><tr><th>Document</th><th>Type</th><th>Pages</th><th>Mode parsing</th><th>Segments</th></tr></thead>
+    <tbody>
+      <tr><td>gdpr_full.pdf</td><td><span class="badge blue">Règlement</span></td><td>~88</td><td>Article extraction</td><td>Articles 1-99</td></tr>
+      <tr><td>rgpd_full.pdf</td><td><span class="badge blue">Règlement FR</span></td><td>~88</td><td>Article extraction</td><td>Articles 1-99</td></tr>
+      <tr><td>rgpd_recitals.pdf</td><td><span class="badge gold">Recitals</span></td><td>~40</td><td>Recital extraction</td><td>Recitals 1-173</td></tr>
+      <tr><td>ai_act_full.pdf</td><td><span class="badge purple">Règlement</span></td><td>~144</td><td>Article extraction</td><td>Articles 1-113</td></tr>
+      <tr><td>ai_act_annexes.pdf</td><td><span class="badge orange">Annexes</span></td><td>~30</td><td>Annex extraction</td><td>Annexes I-XIII</td></tr>
+      <tr><td>data_governance_act.pdf</td><td><span class="badge blue">Règlement</span></td><td>~35</td><td>Article extraction</td><td>Articles 1-36</td></tr>
+      <tr><td>edpb_automated_decision.pdf</td><td><span class="badge green">Guidelines</span></td><td>37</td><td><strong style="color:var(--orange)">Freetext (pages)</strong></td><td>37 pages</td></tr>
+      <tr><td>cnil_ai_recommendations.pdf</td><td><span class="badge green">Guidelines</span></td><td>176</td><td><strong style="color:var(--orange)">Freetext (pages)</strong></td><td>176 pages</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warning">
+    <div class="callout-title">Cas particulier — Documents CNIL & EDPB</div>
+    <p>Ces documents n'ont pas de structure "Article X" — ce sont des guidelines rédigés en prose. Le parser détecte l'absence d'ancres structurées et bascule automatiquement en mode <code>freetext</code> : 1 page = 1 segment. C'est un fallback robuste qui préserve le contexte sans forcer une structure inexistante.</p>
+  </div>
+</section>
+
+
+<!-- SECTION — INGESTION PIPELINE -->
+<section class="section" id="ingestion">
+  <div class="section-header">
+    <div class="section-number">02</div>
+    <div class="section-title-block">
+      <h2>Étape 1 — Pipeline d'Ingestion</h2>
+      <p>PDF → Bronze → Silver · Extraction, nettoyage, chunking</p>
+    </div>
+  </div>
+
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="flow-step-num">1</div>
+      <div class="flow-step-content">
+        <h4>pdf_parser.py — Extraction brute</h4>
+        <p>PyMuPDF reconstruit le flux de texte complet du PDF. On supprime le bruit structurel : numéros de page isolés, headers "Official Journal of the European Union", références de colonnes "L 119/32 EN".</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">2</div>
+      <div class="flow-step-content">
+        <h4>article_extractor.py — Détection des ancres</h4>
+        <p>Regex sur le texte complet pour détecter les ancres <code style="font-family:var(--mono);font-size:11px;background:var(--bg3);padding:1px 4px;color:var(--gold2)">Article \d+</code>, <code style="font-family:var(--mono);font-size:11px;background:var(--bg3);padding:1px 4px;color:var(--gold2)">Annex [IVX]+</code>, <code style="font-family:var(--mono);font-size:11px;background:var(--bg3);padding:1px 4px;color:var(--gold2)">Recital \d+</code>. Slicing entre ancres successives pour isoler chaque unité logique.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">3</div>
+      <div class="flow-step-content">
+        <h4>metadata_builder.py — Enrichissement</h4>
+        <p>Chaque segment reçoit : source document, type (article/recital/annex/freetext), numéro, pages couvertes, date d'extraction, langue détectée.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">4</div>
+      <div class="flow-step-content">
+        <h4>chunker.py — Découpage sémantique</h4>
+        <p>Paramètres : max_chars=1200 (~300 tokens), overlap_chars=200 (~50 tokens), min_chars=100. L'overlap de 17% empêche la perte de contexte aux frontières.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">5</div>
+      <div class="flow-step-content">
+        <h4>pipeline.py — Orchestration</h4>
+        <p>Itère sur data/raw/, appelle les modules dans l'ordre, écrit bronze/ puis silver/. Logs détaillés par document.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Choix : PyMuPDF vs alternatives</h3>
+  <div class="three-col">
+    <div class="scale-card our">
+      <div class="scale-tag">✦ Notre choix — PyMuPDF</div>
+      <h5>fitz · C-bindings · Rapide</h5>
+      <p>Meilleure gestion des PDFs multi-colonnes, encoding UTF-8 natif, reconstruction des lignes correcte. Benchmark : 2x plus rapide que pdfplumber sur nos documents.</p>
+    </div>
+    <div class="scale-card pro">
+      <div class="scale-tag">◈ Alternative — pdfplumber</div>
+      <h5>Pure Python · Lisible</h5>
+      <p>Excellent pour extraire des tableaux structurés. Plus lent mais plus configurables pour PDF avec layout complexe. Choix si les docs ont beaucoup de tables.</p>
+    </div>
+    <div class="scale-card big">
+      <div class="scale-tag">⬡ Large Scale — AWS Textract</div>
+      <h5>OCR cloud · PDFs scannés</h5>
+      <p>Pour des PDFs scannés ou photos de documents. Coût ~$1.50/1000 pages. Indispensable pour des archives judiciaires non-digitales.</p>
+    </div>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Paramètres de chunking — Raisonnement</h3>
+  <div class="two-col">
+    <div class="callout info">
+      <div class="callout-title">max_chars = 1200 (~300 tokens)</div>
+      <p>all-MiniLM-L6-v2 a une limite de 256 tokens. On reste sous ce seuil pour garantir que l'embedding capture le chunk entier. 1200 chars = ~300 tokens = marge de sécurité de 15%.</p>
+    </div>
+    <div class="callout info">
+      <div class="callout-title">overlap = 200 chars (17%)</div>
+      <p>Standard RAG : 10-20% d'overlap. Un Article GDPR peut se terminer en milieu de phrase au chunk N — le chunk N+1 reprend les 200 derniers caractères pour préserver le contexte légal complet.</p>
+    </div>
+  </div>
+
+  <div class="result-box">
+    <div class="result-title">✓ Résultats Pipeline — Logs de production</div>
+    <pre><span class="c-output">$ python -m ingestion.pipeline</span>
+
+<span class="c-ok">[✓] gdpr_full.pdf</span>         → <span class="c-num">99</span> articles  → <span class="c-num">387</span> chunks
+<span class="c-ok">[✓] rgpd_full.pdf</span>         → <span class="c-num">99</span> articles  → <span class="c-num">391</span> chunks
+<span class="c-ok">[✓] rgpd_recitals.pdf</span>     → <span class="c-num">173</span> recitals → <span class="c-num">298</span> chunks
+<span class="c-ok">[✓] ai_act_full.pdf</span>       → <span class="c-num">113</span> articles → <span class="c-num">441</span> chunks
+<span class="c-ok">[✓] ai_act_annexes.pdf</span>    → <span class="c-num">13</span> annexes  → <span class="c-num">89</span> chunks
+<span class="c-ok">[✓] data_governance_act.pdf</span>→ <span class="c-num">36</span> articles → <span class="c-num">134</span> chunks
+<span class="c-ok">[✓] edpb_automated_decision.pdf</span> → <span class="c-num">37</span> pages (freetext) → <span class="c-num">148</span> chunks
+<span class="c-ok">[✓] cnil_ai_recommendations.pdf</span> → <span class="c-num">176</span> pages (freetext) → <span class="c-num">128</span> chunks
+
+<span class="c-comment">──────────────────────────────────────────</span>
+<span class="c-ok">8/8 documents traités</span>
+<span class="c-output">Bronze : 1054 segments   Silver : <span class="c-num">2016</span> chunks</span>
+<span class="c-output">Durée totale : ~45 secondes</span></pre>
+  </div>
+</section>
+
+
+<!-- SECTION — EMBEDDING & FAISS -->
+<section class="section" id="embedding">
+  <div class="section-header">
+    <div class="section-number">03</div>
+    <div class="section-title-block">
+      <h2>Étape 2 — Embedding & Index FAISS</h2>
+      <p>Vectorisation · Recherche sémantique · Déduplication</p>
+    </div>
+  </div>
+
+  <p style="color:var(--text-mid);margin-bottom:28px;">L'embedding transforme chaque chunk texte en vecteur numérique dense. Deux chunks sémantiquement proches auront des vecteurs proches dans l'espace vectoriel. C'est la fondation de la recherche sémantique — radicalement différente d'une recherche par mots-clés.</p>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:0 0 16px;">Choix du modèle d'embedding</h3>
+  <table class="ref-table">
+    <thead><tr><th>Modèle</th><th>Dimensions</th><th>Limite tokens</th><th>Taille</th><th>Vitesse (M4)</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>all-MiniLM-L6-v2 ✦</td><td>384</td><td>256</td><td>90 MB</td><td>139 chunks/sec</td><td><span class="badge green">Retenu</span></td></tr>
+      <tr><td>bge-large-en-v1.5</td><td>1024</td><td>512</td><td>1.3 GB</td><td>~40 chunks/sec</td><td><span class="badge red">Trop lent/lourd</span></td></tr>
+      <tr><td>text-embedding-ada-002</td><td>1536</td><td>8191</td><td>API</td><td>Dépend réseau</td><td><span class="badge orange">Coût + latence API</span></td></tr>
+      <tr><td>multilingual-e5-large</td><td>1024</td><td>512</td><td>1.1 GB</td><td>~35 chunks/sec</td><td><span class="badge blue">Utile si multi-langue critique</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout gold">
+    <div class="callout-title">Raisonnement Stratégique — Pourquoi all-MiniLM-L6-v2</div>
+    <p>Sur 2016 vecteurs, la qualité d'embedding est moins critique que sur 2M vecteurs. all-MiniLM-L6-v2 atteint 58.8 sur BEIR benchmark vs 63.6 pour bge-large — soit 8% de différence de qualité pour 3x le coût en vitesse et mémoire. Le reranker (étape 4) compense ce delta de qualité au moment de la récupération finale. C'est un trade-off calculé et documenté.</p>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">FAISS — Choix de l'index</h3>
+  <div class="two-col">
+    <div class="info-card">
+      <h4>IndexFlatIP — Notre choix</h4>
+      <p>Recherche exacte par produit scalaire (Inner Product). On normalise les vecteurs en L2 avant insertion → IP = cosine similarity. Aucune approximation, résultats garantis optimaux. Latence : &lt; 5ms sur 2016 vecteurs.</p>
+    </div>
+    <div class="info-card">
+      <h4>IndexIVFFlat — Alternative scale</h4>
+      <p>Divise l'espace en clusters (Voronoi). Cherche seulement dans les N clusters les plus proches. 10-100x plus rapide sur &gt;100K vecteurs, mais résultats approximatifs. Indispensable au-delà de 500K vecteurs.</p>
+    </div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">build_index.py — Logique core</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-comment"># 1. Charger les chunks depuis silver/</span>
+chunks = load_jsonl(<span class="c-string">"data/silver/chunks.jsonl"</span>)
+
+<span class="c-comment"># 2. Encoder avec device="mps" (Apple Silicon M4)</span>
+embedder = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, device=<span class="c-string">"mps"</span>)
+embeddings = embedder.encode(texts, show_progress_bar=<span class="c-flag">False</span>)
+<span class="c-comment"># ⚠ show_progress_bar=False obligatoire en contexte async</span>
+
+<span class="c-comment"># 3. Normalisation L2 → cosine similarity via IndexFlatIP</span>
+faiss.normalize_L2(embeddings)
+
+<span class="c-comment"># 4. Créer et peupler l'index</span>
+index = faiss.IndexFlatIP(<span class="c-num">384</span>)   <span class="c-comment"># 384 = dimension all-MiniLM</span>
+index.add(embeddings)
+
+<span class="c-comment"># 5. Persister</span>
+faiss.write_index(index, <span class="c-string">"data/vector_store/legal_index.faiss"</span>)</pre>
+  </div>
+
+  <div class="result-box">
+    <div class="result-title">✓ Logs build_index.py</div>
+    <pre><span class="c-output">$ python -m rag.build_index</span>
+
+<span class="c-output">Chargement de 2016 chunks depuis silver/...</span>
+<span class="c-output">Encodage sur device: <span class="c-ok">mps</span></span>
+<span class="c-output">Vitesse : <span class="c-num">139</span> chunks/sec</span>
+<span class="c-output">Durée encodage : ~14.5 secondes</span>
+<span class="c-output">Normalisation L2 : OK</span>
+<span class="c-output">Index FAISS : <span class="c-num">2016</span> vecteurs, <span class="c-num">384</span> dimensions</span>
+<span class="c-output">Taille sur disque : <span class="c-num">3024</span> KB (legal_index.faiss)</span>
+<span class="c-ok">[✓] Index construit avec succès</span>
+
+<span class="c-warn">UserWarning: UNEXPECTED: embeddings.position_ids</span>
+<span class="c-comment"># → Warning normal de compatibilité HuggingFace, pas une erreur</span></pre>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Bug résolu — Déduplication des résultats</h3>
+  <div class="callout danger">
+    <div class="callout-title">Problème détecté</div>
+    <p>La requête "data controller obligations" retournait <strong>Recital 26 deux fois</strong> dans les résultats — avec des scores différents mais le même contenu. Cela polluait le contexte envoyé à Claude avec de l'information redondante.</p>
+  </div>
+  <div class="callout tip">
+    <div class="callout-title">Solution implémentée</div>
+    <p>Ajout d'un set <code>seen_segments</code> dans la fonction <code>search()</code> de vector_store.py. Avant d'ajouter un résultat, on vérifie si <code>segment_id</code> est déjà présent. Si oui, on skip. Simple, O(1) par lookup, aucun impact sur les performances.</p>
+  </div>
+
+  <div class="result-box">
+    <div class="result-title">✓ Validation search_test.py — 5 requêtes</div>
+    <pre><span class="c-comment">Query 1: "What are the obligations of a data controller?"</span>
+  <span class="c-ok">→</span> GDPR Article 24 (score: <span class="c-num">0.63</span>) | Article 26 (<span class="c-num">0.61</span>) | Recital 74 (<span class="c-num">0.60</span>)
+
+<span class="c-comment">Query 2: "High-risk AI systems requirements"</span>
+  <span class="c-ok">→</span> AI Act Recital 123 (score: <span class="c-num">0.80</span>) <span class="c-comment">← excellent</span>
+
+<span class="c-comment">Query 3: "Right to erasure GDPR"</span>
+  <span class="c-ok">→</span> GDPR Article 17 (score: <span class="c-num">0.71</span>) | Recital 65 (<span class="c-num">0.68</span>)
+
+<span class="c-comment">Query 4: "Data governance obligations SME"</span>
+  <span class="c-ok">→</span> DGA Article 12 (score: <span class="c-num">0.67</span>)
+
+<span class="c-comment">Query 5: "Automated decision making profiling"</span>
+  <span class="c-ok">→</span> GDPR Article 22 (score: <span class="c-num">0.74</span>) | EDPB Guidelines p.8 (<span class="c-num">0.71</span>)
+
+<span class="c-ok">5/5 requêtes — résultats pertinents ✓  |  Aucun doublon ✓</span></pre>
+  </div>
+</section>
+
+
+<!-- SECTION — FASTAPI -->
+<section class="section" id="api">
+  <div class="section-header">
+    <div class="section-number">04</div>
+    <div class="section-title-block">
+      <h2>Étape 3 — API FastAPI</h2>
+      <p>Singleton pattern · Query expansion · Intégration Claude</p>
+    </div>
+  </div>
+
+  <p style="color:var(--text-mid);margin-bottom:28px;">Le choix de FastAPI n'est pas anodin : c'est le seul framework Python qui offre <strong style="color:#fff">async natif</strong>, génération automatique OpenAPI/Swagger, et <strong style="color:#fff">lifespan hooks</strong> — essentiels pour charger les modèles ML une seule fois au démarrage sans bloquer les requêtes.</p>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:0 0 16px;">Pattern Singleton — Architecture critique</h3>
+
+  <div class="callout gold">
+    <div class="callout-title">Décision Architecturale Majeure</div>
+    <p>Les modèles ML sont lourds à charger : all-MiniLM-L6-v2 prend ~2s, le cross-encoder ~3s. Sans singleton, chaque requête HTTP rechargerait les modèles → latence insupportable. Le pattern singleton via <code>lifespan()</code> charge tout <strong>une seule fois au démarrage</strong> et garde les instances en mémoire pour toute la durée de vie du serveur.</p>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">main.py — Lifespan & Singletons</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-comment"># 3 singletons globaux</span>
+_vector_store: VectorStore | <span class="c-flag">None</span> = <span class="c-flag">None</span>
+_embedder:     LegalEmbedder | <span class="c-flag">None</span> = <span class="c-flag">None</span>
+_reranker:     LegalReranker | <span class="c-flag">None</span> = <span class="c-flag">None</span>
+
+<span class="c-comment"># Chargement unique au démarrage du serveur</span>
+<span class="c-cmd">@asynccontextmanager</span>
+<span class="c-flag">async def</span> lifespan(app: FastAPI):
+    <span class="c-comment"># STARTUP</span>
+    _vector_store = VectorStore(); _vector_store.load()
+    _embedder     = LegalEmbedder()
+    _reranker     = LegalReranker()     <span class="c-comment"># lazy load</span>
+    <span class="c-cmd">yield</span>
+    <span class="c-comment"># SHUTDOWN — libération mémoire</span>
+
+<span class="c-comment"># Getters thread-safe pour les routes</span>
+<span class="c-flag">def</span> get_vector_store() -> VectorStore: <span class="c-flag">return</span> _vector_store
+<span class="c-flag">def</span> get_embedder()     -> LegalEmbedder: <span class="c-flag">return</span> _embedder
+<span class="c-flag">def</span> get_reranker()     -> LegalReranker: <span class="c-flag">return</span> _reranker</pre>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Pipeline de recherche complet</h3>
+
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="flow-step-num">1</div>
+      <div class="flow-step-content">
+        <h4>Query Expansion — 3 reformulations</h4>
+        <p>Claude génère 3 reformulations de la question originale. Chacune est embedée et cherchée dans FAISS. Les résultats sont fusionnés et dédupliqués. Cela contourne le problème du "vocabulary mismatch" : "obligations controller" vs "responsabilités responsable de traitement".</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">2</div>
+      <div class="flow-step-content">
+        <h4>FAISS Retrieval — k*2 candidats</h4>
+        <p>On récupère le double des chunks nécessaires (si k=3, on récupère 6). Ces candidats supplémentaires alimentent le reranker qui sélectionne les k meilleurs parmi eux.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">3</div>
+      <div class="flow-step-content">
+        <h4>Reranking optionnel — Cross-encoder</h4>
+        <p>Si <code style="font-family:var(--mono);font-size:11px;background:var(--bg3);padding:1px 4px;color:var(--gold2)">use_reranking=true</code>, le cross-encoder reclasse les candidats. Sinon, top-k FAISS direct.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">4</div>
+      <div class="flow-step-content">
+        <h4>Génération Claude — Prompt strict</h4>
+        <p>Les chunks retenus sont injectés dans le contexte. Claude a l'instruction stricte : citer les sources exactes, refuser de répondre si l'information est absente des chunks fournis. Zéro hallucination tolérée.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Endpoints API</h3>
+  <table class="ref-table">
+    <thead><tr><th>Méthode</th><th>Route</th><th>Description</th><th>Paramètres</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td>/health</td><td>Statut serveur + modèles chargés</td><td>—</td></tr>
+      <tr><td>POST</td><td>/search</td><td>Recherche RAG complète</td><td>query, k, use_reranking</td></tr>
+    </tbody>
+  </table>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">Lancement serveur</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-comment"># Variable d'env obligatoire — modèles en cache local</span>
+<span class="c-cmd">TRANSFORMERS_OFFLINE=1</span> uvicorn api.main:app <span class="c-flag">--reload</span> <span class="c-flag">--port</span> <span class="c-num">8000</span>
+
+<span class="c-comment"># Swagger UI disponible sur :</span>
+<span class="c-string">http://localhost:8000/docs</span>
+
+<span class="c-comment"># Test sanity check</span>
+<span class="c-cmd">curl</span> http://localhost:8000/health
+<span class="c-output">{"status":"ok","vector_store":true,"embedder":true,"reranker":true}</span></pre>
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">TRANSFORMERS_OFFLINE=1 — Pourquoi ?</div>
+    <p>Sans cette variable, sentence-transformers tente de contacter HuggingFace Hub à chaque démarrage pour vérifier les mises à jour des modèles. Sur un réseau instable ou en démo offline, cela cause des timeouts de 30s. <code>TRANSFORMERS_OFFLINE=1</code> force l'utilisation du cache local systématiquement.</p>
+  </div>
+</section>
+
+
+<!-- SECTION — RERANKER -->
+<section class="section" id="reranker">
+  <div class="section-header">
+    <div class="section-number">05</div>
+    <div class="section-title-block">
+      <h2>Étape 4 — Cross-Encoder Reranker</h2>
+      <p>Two-stage retrieval · Précision maximale · LegalReranker</p>
+    </div>
+  </div>
+
+  <p style="color:var(--text-mid);margin-bottom:28px;">Le reranker est la pièce la plus sophistiquée du système. Il répond à un problème fondamental : <strong style="color:#fff">les bi-encoders (FAISS) sont rapides mais imprécis</strong>. Le cross-encoder est lent mais d'une précision remarquable. On combine les deux en pipeline séquentiel.</p>
+
+  <div class="two-col">
+    <div class="info-card">
+      <h4>Bi-encoder (FAISS) — Stage 1</h4>
+      <p>Encode query et documents <strong>séparément</strong>. Comparaison par produit scalaire. Très rapide (< 5ms), scalable à des millions de vecteurs. Mais perd les interactions query-document fines.</p>
+    </div>
+    <div class="info-card">
+      <h4>Cross-encoder (Reranker) — Stage 2</h4>
+      <p>Encode <strong>[query + document]</strong> ensemble dans un seul forward pass du transformer. Capture toutes les interactions contextuelles. 3-5x plus précis qu'un bi-encoder, mais O(n) vs O(1) en temps.</p>
+    </div>
+  </div>
+
+  <div class="callout gold">
+    <div class="callout-title">Raisonnement Two-Stage</div>
+    <p>FAISS récupère k*2=6 candidats en < 5ms. Le cross-encoder reclasse ces 6 candidats en ~14s (M4, MPS). Si on avait appliqué le cross-encoder directement sur les 2016 vecteurs, cela prendrait ~75 minutes. Le two-stage permet d'avoir la précision du cross-encoder avec la scalabilité du bi-encoder.</p>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">reranker.py — LegalReranker class</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-flag">class</span> LegalReranker:
+    MODEL = <span class="c-string">"cross-encoder/ms-marco-MiniLM-L-6-v2"</span>  <span class="c-comment"># 67MB</span>
+
+    <span class="c-flag">def</span> __init__(self):
+        self._model = <span class="c-flag">None</span>  <span class="c-comment"># lazy load — pas chargé avant le 1er appel</span>
+
+    <span class="c-flag">def</span> _load(self):
+        <span class="c-flag">if</span> self._model <span class="c-flag">is None</span>:
+            self._model = CrossEncoder(self.MODEL, device=<span class="c-string">"mps"</span>)
+            <span class="c-comment"># ⚠ device="mps" obligatoire sur M4</span>
+
+    <span class="c-flag">def</span> is_available(self) -> bool:
+        <span class="c-flag">try</span>: self._load(); <span class="c-flag">return True</span>
+        <span class="c-flag">except</span>: <span class="c-flag">return False</span>
+
+    <span class="c-flag">def</span> rerank(self, query: str, chunks: list, top_k: int) -> list:
+        self._load()
+        pairs = [(query, c[<span class="c-string">"text"</span>]) <span class="c-flag">for</span> c <span class="c-flag">in</span> chunks]
+        scores = self._model.predict(pairs,
+                     show_progress_bar=<span class="c-flag">False</span>)  <span class="c-comment"># ⚠ async safe</span>
+        ranked = sorted(zip(chunks, scores),
+                        key=<span class="c-flag">lambda</span> x: x[1], reverse=<span class="c-flag">True</span>)
+        <span class="c-flag">return</span> [c | {<span class="c-string">"rerank_score"</span>: float(s)} <span class="c-flag">for</span> c, s <span class="c-flag">in</span> ranked[:top_k]]</pre>
+  </div>
+
+  <div class="result-box">
+    <div class="result-title">✓ Test de validation reranker — Résultats commentés</div>
+    <pre><span class="c-output">Query: "What are the obligations of a data controller under GDPR?"</span>
+<span class="c-output">k=3, use_reranking=true → FAISS récupère k*2=6 candidats</span>
+
+<span class="c-comment">─── Scores FAISS (bi-encoder) ──────────────────────────</span>
+<span class="c-output">  1. Recital 95   score: <span class="c-num">0.661</span>  ← FAISS top 1</span>
+<span class="c-output">  2. Recital 79   score: <span class="c-num">0.659</span></span>
+<span class="c-output">  3. Recital 74   score: <span class="c-num">0.647</span>  ← FAISS top 3</span>
+
+<span class="c-comment">─── Scores Cross-Encoder (après reranking) ─────────────</span>
+<span class="c-ok">  1. Recital 74   rerank: 3.42  ← PROMU de #3 à #1 ✦</span>
+<span class="c-output">  2. Recital 79   rerank: 2.11  ← stable #2</span>
+<span class="c-warn">  3. Recital 95   rerank: 1.03  ← RÉTROGRADÉ de #1 à #3</span>
+
+<span class="c-comment">─── Interprétation ─────────────────────────────────────</span>
+<span class="c-comment"># Recital 74 = "responsabilité du responsable du traitement"</span>
+<span class="c-comment"># Le cross-encoder a correctement détecté la correspondance</span>
+<span class="c-comment"># sémantique profonde entre "obligations data controller"</span>
+<span class="c-comment"># et le contenu spécifique du Recital 74.</span>
+<span class="c-comment"># Le FAISS l'avait sous-estimé car moins de tokens en commun.</span>
+
+<span class="c-output">Modèle utilisé : claude-sonnet-4-20250514</span>
+<span class="c-output">Temps de traitement total : <span class="c-num">14.3</span>s</span>
+<span class="c-ok">Réponse générée avec citations exactes ✓</span></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">Interprétation des scores cross-encoder</div>
+    <p>Les scores cross-encoder ne sont pas des probabilités (0-1). Ce sont des logits bruts pouvant être négatifs ou très élevés. Ce qui compte c'est l'ordre relatif : 3.42 > 2.11 > 1.03. Un score négatif n'indique pas l'absence de pertinence, juste une pertinence plus faible par rapport aux autres candidats.</p>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Choix du modèle reranker</h3>
+  <div class="scale-grid">
+    <div class="scale-card our">
+      <div class="scale-tag">✦ Notre choix</div>
+      <h5>ms-marco-MiniLM-L-6-v2</h5>
+      <p>67MB, local, gratuit. Entraîné sur MS MARCO (passage retrieval). Excellent équilibre précision/vitesse. Suffisant pour du texte légal en anglais.</p>
+    </div>
+    <div class="scale-card pro">
+      <div class="scale-tag">◈ Cabinet Conseil</div>
+      <h5>Cohere Rerank API</h5>
+      <p>Zéro infrastructure, API REST simple, support multilingue natif (essentiel pour GDPR FR + EN). Coût : ~$2/1000 requêtes. Choix si volume &lt; 50K req/jour.</p>
+    </div>
+    <div class="scale-card big">
+      <div class="scale-tag">⬡ Large Scale</div>
+      <h5>bge-reranker-large fine-tuned</h5>
+      <p>Fine-tuning sur corpus légal spécifique. Déploiement TorchServe avec GPU. Précision optimale pour le domaine. Coût infra : ~$500/mois GPU cloud.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- SECTION — GIT -->
+<section class="section" id="git">
+  <div class="section-header">
+    <div class="section-number">06</div>
+    <div class="section-title-block">
+      <h2>Git — Versioning & Workflow</h2>
+      <p>Conventional commits · Feature branches · GitHub remote</p>
+    </div>
+  </div>
+
+  <p style="color:var(--text-mid);margin-bottom:28px;">Le versioning n'est pas une contrainte administrative — c'est un <strong style="color:#fff">outil de traçabilité des décisions techniques</strong>. Chaque commit documente quoi a changé, pourquoi, et dans quel contexte. Un historique propre permet de revenir à n'importe quel état du projet en 30 secondes.</p>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:0 0 16px;">Initialisation & Configuration</h3>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">Setup initial du repo</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-comment"># 1. Initialisation locale</span>
+<span class="c-cmd">git init</span>
+<span class="c-cmd">git config</span> user.name <span class="c-string">"Gaël"</span>
+<span class="c-cmd">git config</span> user.email <span class="c-string">"gael@..."</span>
+
+<span class="c-comment"># 2. .gitignore — protéger les secrets et l'environnement</span>
+<span class="c-output">.env                    # ← CRITIQUE : contient ANTHROPIC_API_KEY</span>
+<span class="c-output">venv/                   # dépendances Python non versionnées</span>
+<span class="c-output">__pycache__/            # bytecode Python</span>
+<span class="c-output">data/raw/               # PDFs sources (binaires lourds)</span>
+<span class="c-output">data/vector_store/      # index FAISS généré (reproductible)</span>
+<span class="c-output">.DS_Store               # métadonnées macOS</span>
+
+<span class="c-comment"># 3. Premier commit</span>
+<span class="c-cmd">git add</span> .
+<span class="c-cmd">git commit</span> <span class="c-flag">-m</span> <span class="c-string">"chore: initial project structure"</span>
+
+<span class="c-comment"># 4. Lier au remote GitHub</span>
+<span class="c-cmd">git remote add origin</span> git@github.com:gael-cvc/AI-Legal-Governance-Platform.git
+<span class="c-cmd">git push</span> <span class="c-flag">-u origin main</span></pre>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Workflow Feature Branch — Étape Reranker</h3>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">Cycle complet feature/reranking</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-comment"># Créer la branche depuis main (toujours partir d'un main propre)</span>
+<span class="c-cmd">git checkout</span> <span class="c-flag">-b</span> <span class="c-string">feature/reranking</span>
+<span class="c-output">Switched to a new branch 'feature/reranking'</span>
+
+<span class="c-comment"># Développement + commits atomiques</span>
+<span class="c-cmd">git add</span> rag/reranker.py
+<span class="c-cmd">git commit</span> <span class="c-flag">-m</span> <span class="c-string">"feat(rag): add LegalReranker with cross-encoder singleton"</span>
+
+<span class="c-cmd">git add</span> api/search.py api/main.py
+<span class="c-cmd">git commit</span> <span class="c-flag">-m</span> <span class="c-string">"feat(api): integrate reranker into search pipeline"</span>
+
+<span class="c-comment"># Merge fast-forward dans main (historique linéaire)</span>
+<span class="c-cmd">git checkout main</span>
+<span class="c-cmd">git merge</span> <span class="c-flag">--ff-only</span> <span class="c-string">feature/reranking</span>
+<span class="c-output">Updating a3f2c1d..b7e8f2a</span>
+<span class="c-output">Fast-forward</span>
+<span class="c-ok"> api/main.py   | 12 +++++++++</span>
+<span class="c-ok"> api/search.py | 28 ++++++++++++++++++</span>
+<span class="c-ok"> rag/reranker.py | 67 +++++++++++++++++++++++++++++++++++++++++++</span>
+<span class="c-output"> 3 files changed, 107 insertions(+)</span>
+
+<span class="c-comment"># Supprimer la branche locale (travail terminé)</span>
+<span class="c-cmd">git branch</span> <span class="c-flag">-d</span> <span class="c-string">feature/reranking</span>
+<span class="c-output">Deleted branch feature/reranking (was b7e8f2a).</span>
+
+<span class="c-comment"># Push vers GitHub</span>
+<span class="c-cmd">git push origin main</span></pre>
+  </div>
+
+  <div class="callout warning">
+    <div class="callout-title">Problème SSH résolu — Port 443</div>
+    <p>Le port 22 (SSH standard) était bloqué par le réseau. Solution : configurer SSH via le port 443 d'Anthropic/GitHub. Ajouter dans <code>~/.ssh/config</code> :</p>
+    <p style="margin-top:8px"><code>Host github.com</code> → <code>Hostname ssh.github.com</code> → <code>Port 443</code></p>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Convention de commits</h3>
+  <table class="ref-table">
+    <thead><tr><th>Type</th><th>Usage</th><th>Exemple utilisé</th></tr></thead>
+    <tbody>
+      <tr><td>feat</td><td>Nouvelle fonctionnalité</td><td><code style="font-family:var(--mono);font-size:10px;color:var(--gold2)">feat(reranking): cross-encoder singleton — LegalReranker</code></td></tr>
+      <tr><td>fix</td><td>Correction de bug</td><td><code style="font-family:var(--mono);font-size:10px;color:var(--gold2)">fix(rag): deduplicate results via seen_segments set</code></td></tr>
+      <tr><td>chore</td><td>Maintenance, config</td><td><code style="font-family:var(--mono);font-size:10px;color:var(--gold2)">chore: initial project structure</code></td></tr>
+      <tr><td>docs</td><td>Documentation</td><td><code style="font-family:var(--mono);font-size:10px;color:var(--gold2)">docs: add README with setup instructions</code></td></tr>
+      <tr><td>perf</td><td>Optimisation performance</td><td><code style="font-family:var(--mono);font-size:10px;color:var(--gold2)">perf(embedder): switch device cpu → mps</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout tip">
+    <div class="callout-title">Pourquoi --ff-only pour le merge ?</div>
+    <p>Le flag <code>--ff-only</code> garantit que le merge ne crée pas de "merge commit" parasite dans l'historique. Si la branche a divergé, le merge échoue proprement plutôt que de créer un noeud disgracieux. L'historique reste linéaire et lisible avec <code>git log --oneline</code>.</p>
+  </div>
+</section>
+
+
+<!-- SECTION — BUGS & SOLUTIONS -->
+<section class="section" id="bugs">
+  <div class="section-header">
+    <div class="section-number">07</div>
+    <div class="section-title-block">
+      <h2>Problèmes Rencontrés & Solutions</h2>
+      <p>Post-mortem technique · Décisions sous contrainte</p>
+    </div>
+  </div>
+
+  <p style="color:var(--text-mid);margin-bottom:32px;">Tout projet réel rencontre des obstacles. La valeur d'un cabinet conseil réside dans sa capacité à <strong style="color:#fff">diagnostiquer rapidement, décider rationnellement, et documenter</strong> — pour que les mêmes erreurs ne se reproduisent pas.</p>
+
+  <!-- BUG 1 -->
+  <div style="margin-bottom:40px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <span class="badge red">BUG 01</span>
+      <h3 style="font-family:var(--mono);font-size:14px;color:#fff;">Fichiers créés vides dans VS Code</h3>
+    </div>
+    <div class="callout danger">
+      <div class="callout-title">Symptôme</div>
+      <p>Les fichiers Python créés via VS Code "New File" apparaissaient dans le repo mais étaient vides à l'exécution. Le pipeline crashait immédiatement avec <code>ImportError</code>.</p>
+    </div>
+    <div class="callout tip">
+      <div class="callout-title">Cause & Solution</div>
+      <p>VS Code créait parfois des fichiers placeholders vides avant que le contenu soit copié. Solution : créer les fichiers directement via terminal (<code>touch + nano</code>), ou télécharger depuis la conversation et glisser-déposer dans le dossier projet. Toujours vérifier avec <code>wc -l fichier.py</code> avant d'exécuter.</p>
+    </div>
+    <div class="callout info">
+      <div class="callout-title">Alternative évitée</div>
+      <p>Aurait pu utiliser un script de scaffolding automatique. Écarté pour garder le contrôle manuel et comprendre chaque fichier créé.</p>
+    </div>
+  </div>
+
+  <!-- BUG 2 -->
+  <div style="margin-bottom:40px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <span class="badge red">BUG 02</span>
+      <h3 style="font-family:var(--mono);font-size:14px;color:#fff;">__pycache__ cachant les anciens fichiers vides</h3>
+    </div>
+    <div class="callout danger">
+      <div class="callout-title">Symptôme</div>
+      <p>Même après avoir corrigé un fichier, Python continuait à importer l'ancienne version vide. L'erreur persistait malgré des modifications visibles dans l'éditeur.</p>
+    </div>
+    <div class="callout tip">
+      <div class="callout-title">Solution</div>
+      <p>Python compile les modules en bytecode (<code>.pyc</code>) dans <code>__pycache__/</code> pour accélérer les imports. Quand un fichier était vide, Python compilait un module vide. La correction du fichier source ne suffisait pas — il fallait purger le cache.</p>
+    </div>
+    <div class="code-block">
+      <div class="code-header"><span class="code-label">Commande de purge</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+      <pre><span class="c-cmd">find</span> . <span class="c-flag">-type d</span> <span class="c-flag">-name</span> <span class="c-string">"__pycache__"</span> <span class="c-flag">-exec</span> rm <span class="c-flag">-rf</span> {} +
+<span class="c-comment"># Ou plus ciblé :</span>
+<span class="c-cmd">rm</span> <span class="c-flag">-rf</span> rag/__pycache__ api/__pycache__ ingestion/__pycache__</pre>
+    </div>
+  </div>
+
+  <!-- BUG 3 -->
+  <div style="margin-bottom:40px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <span class="badge orange">BUG 03</span>
+      <h3 style="font-family:var(--mono);font-size:14px;color:#fff;">device="cpu" — Inférence lente sur M4</h3>
+    </div>
+    <div class="callout warning">
+      <div class="callout-title">Symptôme</div>
+      <p>L'encodage de 2016 chunks prenait ~2 minutes. Le reranker prenait ~45 secondes pour 6 paires. Totalement inutilisable en démo.</p>
+    </div>
+    <div class="callout tip">
+      <div class="callout-title">Cause & Solution</div>
+      <p>sentence-transformers utilise CPU par défaut sur Mac. Le chip M4 dispose d'un GPU intégré accessible via le backend MPS (Metal Performance Shaders) d'Apple. En passant <code>device="mps"</code>, l'inférence devient 3-5x plus rapide sans aucune modification du code métier.</p>
+    </div>
+    <div class="code-block">
+      <div class="code-header"><span class="code-label">Correction appliquée — partout</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+      <pre><span class="c-comment"># embedder.py</span>
+SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, device=<span class="c-string">"mps"</span>)   <span class="c-comment"># ← était "cpu"</span>
+
+<span class="c-comment"># reranker.py</span>
+CrossEncoder(<span class="c-string">"cross-encoder/ms-marco-MiniLM-L-6-v2"</span>, device=<span class="c-string">"mps"</span>)
+
+<span class="c-comment"># Résultat :</span>
+<span class="c-output">Avant : ~120s pour 2016 embeddings</span>
+<span class="c-ok">Après :  ~14.5s pour 2016 embeddings  (8x plus rapide)</span></pre>
+    </div>
+  </div>
+
+  <!-- BUG 4 -->
+  <div style="margin-bottom:40px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <span class="badge orange">BUG 04</span>
+      <h3 style="font-family:var(--mono);font-size:14px;color:#fff;">progress_bar bloquant l'event loop async</h3>
+    </div>
+    <div class="callout warning">
+      <div class="callout-title">Symptôme</div>
+      <p>Les requêtes POST /search freezaient le serveur pendant l'inférence. Aucune autre requête ne pouvait être traitée en parallèle. FastAPI semblait "bloqué".</p>
+    </div>
+    <div class="callout tip">
+      <div class="callout-title">Cause & Solution</div>
+      <p>La barre de progression tqdm (utilisée par sentence-transformers) écrit sur stderr de façon synchrone, bloquant l'event loop asyncio de FastAPI. Solution : <code>show_progress_bar=False</code> dans tous les appels <code>.encode()</code> et <code>.predict()</code>.</p>
+    </div>
+  </div>
+
+  <!-- BUG 5 -->
+  <div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <span class="badge purple">BUG 05</span>
+      <h3 style="font-family:var(--mono);font-size:14px;color:#fff;">Résultats dupliqués — Recital 26 x2</h3>
+    </div>
+    <div class="callout danger">
+      <div class="callout-title">Symptôme</div>
+      <p>La recherche "data controller obligations" retournait le même Recital 26 deux fois avec des scores légèrement différents (0.617 et 0.612). Claude recevait donc du contexte redondant, dégradant la qualité de la réponse.</p>
+    </div>
+    <div class="callout tip">
+      <div class="callout-title">Cause — Query Expansion</div>
+      <p>La query expansion génère 3 reformulations. Chacune est cherchée dans FAISS. Le Recital 26 apparaissait dans les top-k de 2 reformulations différentes. Les listes de résultats n'étaient pas fusionnées avec déduplication.</p>
+    </div>
+    <div class="code-block">
+      <div class="code-header"><span class="code-label">Fix — vector_store.py search()</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+      <pre><span class="c-flag">def</span> search(self, query_embedding, k=<span class="c-num">5</span>):
+    scores, indices = self.index.search(query_embedding, k * <span class="c-num">3</span>)
+    results = []
+    seen_segments = set()  <span class="c-comment"># ← ajout déduplication</span>
+
+    <span class="c-flag">for</span> score, idx <span class="c-flag">in</span> zip(scores[<span class="c-num">0</span>], indices[<span class="c-num">0</span>]):
+        <span class="c-flag">if</span> score < MIN_SCORE: <span class="c-flag">break</span>  <span class="c-comment"># résultats triés → break</span>
+        chunk = self.chunks[idx]
+        seg_id = chunk[<span class="c-string">"segment_id"</span>]
+
+        <span class="c-flag">if</span> seg_id <span class="c-flag">in</span> seen_segments: <span class="c-flag">continue</span>  <span class="c-comment"># skip doublon</span>
+        seen_segments.add(seg_id)
+        results.append({**chunk, <span class="c-string">"score"</span>: float(score)})
+
+    <span class="c-flag">return</span> results[:k]</pre>
+    </div>
+  </div>
+</section>
+
+
+<!-- SECTION — RÉSULTATS -->
+<section class="section" id="results">
+  <div class="section-header">
+    <div class="section-number">08</div>
+    <div class="section-title-block">
+      <h2>Résultats Finaux & État du Projet</h2>
+      <p>Validation complète · Métriques · Prochaines étapes</p>
+    </div>
+  </div>
+
+  <div class="result-box">
+    <div class="result-title">✓ Validation finale — GET /health</div>
+    <pre><span class="c-output">$ curl http://localhost:8000/health</span>
+<span class="c-ok">{
+  "status": "ok",
+  "vector_store": { "loaded": true, "n_vectors": 2016, "dimension": 384 },
+  "embedder":     { "loaded": true, "model": "all-MiniLM-L6-v2", "device": "mps" },
+  "reranker":     { "loaded": true, "model": "ms-marco-MiniLM-L-6-v2", "device": "mps" }
+}</span></pre>
+  </div>
+
+  <div class="result-box" style="border-left-color:var(--gold);margin-top:16px;">
+    <div class="result-title" style="color:var(--gold);">✦ Réponse Claude — Exemple production</div>
+    <pre><span class="c-comment">POST /search</span>
+<span class="c-output">{ "query": "What are the obligations of a data controller under GDPR?",</span>
+<span class="c-output">  "k": 3, "use_reranking": true }</span>
+
+<span class="c-output">─────────────────────────────────────────────────────────</span>
+<span class="c-ok">Under the GDPR, a data controller bears primary responsibility</span>
+<span class="c-ok">for ensuring compliance. Specifically:</span>
+<span class="c-ok"></span>
+<span class="c-ok">According to Recital 74, the controller must implement</span>
+<span class="c-ok">appropriate technical and organisational measures to ensure</span>
+<span class="c-ok">compliance with the Regulation and demonstrate such compliance.</span>
+<span class="c-ok"></span>
+<span class="c-ok">Recital 79 further specifies that the controller must ensure</span>
+<span class="c-ok">appropriate oversight of processing operations carried out</span>
+<span class="c-ok">on its behalf...</span>
+<span class="c-output">─────────────────────────────────────────────────────────</span>
+<span class="c-output">Sources : Recital 74 (score: 3.42) | Recital 79 (2.11) | Recital 95 (1.03)</span>
+<span class="c-output">Temps total : 14.3s | Modèle : claude-sonnet-4-20250514</span></pre>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Récapitulatif des métriques</h3>
+  <table class="ref-table">
+    <thead><tr><th>Métrique</th><th>Valeur</th><th>Contexte</th></tr></thead>
+    <tbody>
+      <tr><td>Documents traités</td><td><span style="color:var(--green);font-family:var(--mono)">8/8</span></td><td>100% succès, aucune perte</td></tr>
+      <tr><td>Chunks silver</td><td><span style="color:var(--gold2);font-family:var(--mono)">2016</span></td><td>Prêts à vectoriser</td></tr>
+      <tr><td>Dimensions vecteur</td><td><span style="color:var(--gold2);font-family:var(--mono)">384</span></td><td>all-MiniLM-L6-v2</td></tr>
+      <tr><td>Taille index FAISS</td><td><span style="color:var(--gold2);font-family:var(--mono)">3024 KB</span></td><td>Tient en RAM (~3MB)</td></tr>
+      <tr><td>Vitesse encodage</td><td><span style="color:var(--green);font-family:var(--mono)">139 chunks/sec</span></td><td>MPS, M4</td></tr>
+      <tr><td>Latence FAISS search</td><td><span style="color:var(--green);font-family:var(--mono)">&lt; 5ms</span></td><td>2016 vecteurs, exact</td></tr>
+      <tr><td>Temps reranking (6 paires)</td><td><span style="color:var(--gold2);font-family:var(--mono)">~1-2s</span></td><td>Cross-encoder MPS</td></tr>
+      <tr><td>Temps total /search</td><td><span style="color:var(--gold2);font-family:var(--mono)">14.3s</span></td><td>Avec query expansion + Claude</td></tr>
+      <tr><td>Tests validation</td><td><span style="color:var(--green);font-family:var(--mono)">5/5 ✓</span></td><td>Résultats pertinents, sans doublons</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">État Git — main branch</h3>
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">git log --oneline</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-hash">b7e8f2a</span> <span class="c-ok">feat(reranking): cross-encoder singleton — LegalReranker</span>
+<span class="c-hash">a8d3c12</span> feat(api): FastAPI with singleton pattern + query expansion
+<span class="c-hash">9f1e5b3</span> fix(rag): deduplicate results via seen_segments set
+<span class="c-hash">7c2a8d1</span> feat(rag): FAISS IndexFlatIP + build_index pipeline
+<span class="c-hash">4e9b2f7</span> feat(ingestion): full pipeline raw→bronze→silver (2016 chunks)
+<span class="c-hash">2a5d8c4</span> chore: initial project structure + .gitignore
+<span class="c-comment">
+# Branche active : main
+# feature/reranking : merged ✓ + deleted ✓
+# Remote push : pending (SSH port 443 — réseau instable)</span></pre>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Prochaines étapes recommandées</h3>
+  <div class="three-col">
+    <div class="info-card">
+      <h4>Étape 5 — Évaluation RAG</h4>
+      <ul>
+        <li>Construire un dataset de 50 questions/réponses de référence</li>
+        <li>Mesurer Precision@k, Recall@k, MRR</li>
+        <li>Comparer reranking ON vs OFF</li>
+        <li>Framework : RAGAS ou TruLens</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h4>Étape 6 — Interface</h4>
+      <ul>
+        <li>Frontend minimaliste (Streamlit ou Next.js)</li>
+        <li>Affichage des sources avec highlights</li>
+        <li>Historique des conversations</li>
+        <li>Export PDF des réponses</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h4>Étape 7 — Production</h4>
+      <ul>
+        <li>Authentification JWT ou API keys</li>
+        <li>Rate limiting + logging structuré</li>
+        <li>Docker + déploiement Cloud Run</li>
+        <li>Monitoring latence/erreurs (Datadog/Grafana)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-left">
+    AI Legal Governance Platform<br>
+    Python 3.12 · FastAPI · FAISS · Claude Sonnet 4<br>
+    github.com/gael-cvc/AI-Legal-Governance-Platform
+  </div>
+  <div class="footer-right">
+    Documentation Technique<br>
+    <span style="font-size:11px;color:var(--text-dim);font-family:var(--mono)">v1.0 · Mars 2026</span>
+  </div>
+</div>
+
+</div><!-- /main -->
+</body>
+</html>
