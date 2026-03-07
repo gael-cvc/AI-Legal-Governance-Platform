@@ -388,7 +388,7 @@ pre { padding:20px 24px; font-family:var(--mono); font-size:12px; line-height:1.
   <div class="two-col">
     <div class="callout info">
       <div class="callout-title">max_chars = 1200 (~300 tokens)</div>
-      <p>all-MiniLM-L6-v2 a une limite de 256 tokens. On reste sous ce seuil pour garantir que l'embedding capture le chunk entier. 1200 chars = ~300 tokens = marge de sécurité de 15%.</p>
+      <p>all-MiniLM-L6-v2 tronque silencieusement au-delà de 256 tokens. À 1200 chars (~300 tokens), les ~44 tokens excédentaires sont ignorés — ce comportement est acceptable car le début d'un article légal concentre toujours l'essentiel du sens (définition, sujet, obligation principale). Le contexte tronqué correspond systématiquement aux détails secondaires en fin de paragraphe.</p>
     </div>
     <div class="callout info">
       <div class="callout-title">overlap = 200 chars (17%)</div>
@@ -773,7 +773,7 @@ _reranker:     LegalReranker | <span class="c-flag">None</span> = <span class="c
 <span class="c-cmd">git commit</span> <span class="c-flag">-m</span> <span class="c-string">"chore: initial project structure"</span>
 
 <span class="c-comment"># 4. Lier au remote GitHub</span>
-<span class="c-cmd">git remote add origin</span> git@github.com:gael-cvc/AI-Legal-Governance-Platform.git
+<span class="c-cmd">git remote add origin</span> <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a3c4cad7e3c4cad7cbd6c18dc0ccce">[email&#160;protected]</a>:gael-cvc/AI-Legal-Governance-Platform.git
 <span class="c-cmd">git push</span> <span class="c-flag">-u origin main</span></pre>
   </div>
 
@@ -851,35 +851,15 @@ _reranker:     LegalReranker | <span class="c-flag">None</span> = <span class="c
   <div style="margin-bottom:40px;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
       <span class="badge red">BUG 01</span>
-      <h3 style="font-family:var(--mono);font-size:14px;color:#fff;">Fichiers créés vides dans VS Code</h3>
+      <h3 style="font-family:var(--mono);font-size:14px;color:#fff;">__pycache__ cachant les anciens fichiers</h3>
     </div>
     <div class="callout danger">
       <div class="callout-title">Symptôme</div>
-      <p>Les fichiers Python créés via VS Code "New File" apparaissaient dans le repo mais étaient vides à l'exécution. Le pipeline crashait immédiatement avec <code>ImportError</code>.</p>
+      <p>Après avoir modifié un fichier Python, l'ancienne version continuait à s'exécuter. L'erreur persistait malgré les modifications visibles dans l'éditeur.</p>
     </div>
     <div class="callout tip">
       <div class="callout-title">Cause & Solution</div>
-      <p>VS Code créait parfois des fichiers placeholders vides avant que le contenu soit copié. Solution : créer les fichiers directement via terminal (<code>touch + nano</code>), ou télécharger depuis la conversation et glisser-déposer dans le dossier projet. Toujours vérifier avec <code>wc -l fichier.py</code> avant d'exécuter.</p>
-    </div>
-    <div class="callout info">
-      <div class="callout-title">Alternative évitée</div>
-      <p>Aurait pu utiliser un script de scaffolding automatique. Écarté pour garder le contrôle manuel et comprendre chaque fichier créé.</p>
-    </div>
-  </div>
-
-  <!-- BUG 2 -->
-  <div style="margin-bottom:40px;">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-      <span class="badge red">BUG 02</span>
-      <h3 style="font-family:var(--mono);font-size:14px;color:#fff;">__pycache__ cachant les anciens fichiers vides</h3>
-    </div>
-    <div class="callout danger">
-      <div class="callout-title">Symptôme</div>
-      <p>Même après avoir corrigé un fichier, Python continuait à importer l'ancienne version vide. L'erreur persistait malgré des modifications visibles dans l'éditeur.</p>
-    </div>
-    <div class="callout tip">
-      <div class="callout-title">Solution</div>
-      <p>Python compile les modules en bytecode (<code>.pyc</code>) dans <code>__pycache__/</code> pour accélérer les imports. Quand un fichier était vide, Python compilait un module vide. La correction du fichier source ne suffisait pas — il fallait purger le cache.</p>
+      <p>Python compile les modules en bytecode (<code>.pyc</code>) dans <code>__pycache__/</code> pour accélérer les imports. Si le cache n'est pas purgé après modification du source, Python continue d'exécuter l'ancienne version compilée. Solution : purger le cache manuellement.</p>
     </div>
     <div class="code-block">
       <div class="code-header"><span class="code-label">Commande de purge</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
@@ -892,7 +872,7 @@ _reranker:     LegalReranker | <span class="c-flag">None</span> = <span class="c
   <!-- BUG 3 -->
   <div style="margin-bottom:40px;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-      <span class="badge orange">BUG 03</span>
+      <span class="badge orange">BUG 02</span>
       <h3 style="font-family:var(--mono);font-size:14px;color:#fff;">device="cpu" — Inférence lente sur M4</h3>
     </div>
     <div class="callout warning">
@@ -920,7 +900,7 @@ CrossEncoder(<span class="c-string">"cross-encoder/ms-marco-MiniLM-L-6-v2"</span
   <!-- BUG 4 -->
   <div style="margin-bottom:40px;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-      <span class="badge orange">BUG 04</span>
+      <span class="badge orange">BUG 03</span>
       <h3 style="font-family:var(--mono);font-size:14px;color:#fff;">progress_bar bloquant l'event loop async</h3>
     </div>
     <div class="callout warning">
@@ -936,7 +916,7 @@ CrossEncoder(<span class="c-string">"cross-encoder/ms-marco-MiniLM-L-6-v2"</span
   <!-- BUG 5 -->
   <div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-      <span class="badge purple">BUG 05</span>
+      <span class="badge purple">BUG 04</span>
       <h3 style="font-family:var(--mono);font-size:14px;color:#fff;">Résultats dupliqués — Recital 26 x2</h3>
     </div>
     <div class="callout danger">
@@ -1084,10 +1064,4 @@ CrossEncoder(<span class="c-string">"cross-encoder/ms-marco-MiniLM-L-6-v2"</span
   </div>
   <div class="footer-right">
     Documentation Technique<br>
-    <span style="font-size:11px;color:var(--text-dim);font-family:var(--mono)">v1.0 · Mars 2026</span>
-  </div>
-</div>
-
-</div><!-- /main -->
-</body>
-</html>
+    <span style="font-size:11px;color:var
