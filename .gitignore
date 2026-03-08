@@ -16,4 +16,4 @@ __pycache__/
 .vscode/
 
 # Logs
-*.log
+*.logmodels_cache/

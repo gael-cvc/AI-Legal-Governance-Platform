@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+
+  api:
+    build: .
+    image: legal-api:latest
+    container_name: legal-api
+    ports:
+      - "8000:8000"         # hôte:container — accès via localhost:8000
+
+    volumes:
+      # Données : index FAISS + chunks + PDFs (lecture seule dans le container)
+      - ./data:/app/data:ro
+
+      # Cache modèles HuggingFace — persistant entre rebuilds
+      # À prépeupler avant le premier lancement (voir README)
+      - ./models_cache:/root/.cache/huggingface
+
+    env_file:
+      - .env                # ANTHROPIC_API_KEY et autres secrets
+
+    environment:
+      - TRANSFORMERS_OFFLINE=1
+      - DEVICE=cpu          # MPS non disponible dans Docker
+
+    restart: unless-stopped # redémarre automatiquement si crash
+
+    # Healthcheck : Docker considère le container "healthy" uniquement
+    # quand /health répond 200 — utile pour les déploiements cloud
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s     # laisse le temps aux modèles de charger
+      retries: 3

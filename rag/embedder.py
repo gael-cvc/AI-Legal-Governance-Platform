@@ -55,6 +55,7 @@ FLUX DE DONNÉES :
 from __future__ import annotations
 
 import logging
+import os
 import time
 
 import numpy as np
@@ -120,14 +121,14 @@ class LegalEmbedder:
         t0 = time.perf_counter()
 
         # SentenceTransformer() télécharge (si nécessaire) et charge le modèle.
-        # device="mps" : Metal Performance Shaders — le GPU intégré d'Apple Silicon.
-        # Sur Mac M4 (et M1/M2/M3), PyTorch 2.x a des bugs connus avec device="cpu"
-        # lors d'encodages dans un contexte async (FastAPI uvicorn) : crash Python
-        # sans stacktrace, causé par une interaction entre le thread pool de PyTorch
-        # et le runtime multiprocessing d'uvicorn --reload.
-        # MPS contourne ce bug et est plus rapide (Neural Engine d'Apple Silicon).
-        # Sur Linux/Windows sans GPU Apple : remplacer par device="cpu".
-        self._model = SentenceTransformer(self.model_name, device="mps")
+        # device : détecté via la variable d'environnement DEVICE.
+        #   DEVICE=mps  → Mac M1/M2/M3/M4 (Metal Performance Shaders, plus rapide)
+        #   DEVICE=cpu  → Linux / Docker / tout autre environnement
+        # Par défaut : "mps" (comportement local inchangé sur Mac).
+        # Dans Docker : docker-compose.yml injecte DEVICE=cpu (MPS non disponible).
+        device = os.getenv("DEVICE", "mps")
+        logger.info(f"Device sélectionné : {device}")
+        self._model = SentenceTransformer(self.model_name, device=device)
 
         elapsed = time.perf_counter() - t0
         logger.info(

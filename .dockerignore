@@ -1,0 +1,49 @@
+# Secrets — jamais dans l'image
+.env
+.env.*
+
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environnement virtuel local
+venv/
+.venv/
+env/
+
+# Données lourdes — montées via volume
+data/raw/
+data/bronze/
+data/silver/
+data/vector_store/
+models_cache/
+
+# Évaluation — résultats locaux
+evaluation/results/
+
+# Docs et fichiers projet
+docs/
+*.html
+*.pdf
+*.docx
+*.md
+README*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
