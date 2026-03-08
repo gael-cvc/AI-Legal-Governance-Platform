@@ -17,3 +17,6 @@ __pycache__/
 
 # Logs
 *.logmodels_cache/
+logs/
+evaluation/results/
+models_cache/
