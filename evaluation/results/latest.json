@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-03-08T12:55:15.232234",
+  "timestamp": "2026-03-08T21:46:17.983870",
   "recall": {
-    "metric": "recall@5",
+    "metric": "recall@7",
     "score": 1.0,
     "hits": 19,
     "total": 19,
@@ -17,14 +17,16 @@
         ],
         "retrieved_ids": [
           "Article 24",
+          "Article 26",
           "Article 30",
+          "Article 38",
           "Article 39",
           "Article 40",
           "Article 46"
         ],
         "hit": true,
         "expanded": true,
-        "latency_ms": 192.1
+        "latency_ms": 252.8
       },
       {
         "question": "What is the principle of data minimisation?",
@@ -34,14 +36,16 @@
         ],
         "retrieved_ids": [
           "Article 25",
+          "Article 4",
           "Article 5",
           "Recital 156",
-          "Recital 62",
+          "Recital 39",
+          "Recital 69",
           "Recital 78"
         ],
         "hit": true,
         "expanded": true,
-        "latency_ms": 105.2
+        "latency_ms": 305.6
       },
       {
         "question": "What constitutes valid consent under GDPR?",
@@ -51,15 +55,17 @@
           "Article 4"
         ],
         "retrieved_ids": [
+          "Article 13",
           "Article 7",
           "Article 83",
           "Recital 32",
+          "Recital 40",
           "Recital 42",
           "Recital 43"
         ],
         "hit": true,
         "expanded": true,
-        "latency_ms": 81.3
+        "latency_ms": 129.0
       },
       {
         "question": "What are the lawful bases for processing personal data?",
@@ -72,6 +78,8 @@
           "Recital 50"
         ],
         "retrieved_ids": [
+          "Article 5",
+          "Recital 19",
           "Recital 40",
           "Recital 46",
           "Recital 47",
@@ -80,7 +88,7 @@
         ],
         "hit": true,
         "expanded": false,
-        "latency_ms": 109.6
+        "latency_ms": 102.1
       },
       {
         "question": "What is the right to erasure under GDPR?",
@@ -89,15 +97,17 @@
           "Article 17"
         ],
         "retrieved_ids": [
+          "Article 14",
           "Article 15",
           "Article 17",
+          "Article 18",
           "Article 19",
           "Recital 66",
           "Recital 68"
         ],
         "hit": true,
         "expanded": true,
-        "latency_ms": 89.2
+        "latency_ms": 95.1
       },
       {
         "question": "When is a Data Protection Impact Assessment required?",
@@ -107,6 +117,8 @@
         ],
         "retrieved_ids": [
           "Article 35",
+          "Article 64",
+          "Recital 84",
           "Recital 90",
           "Recital 91",
           "Recital 92",
@@ -114,7 +126,7 @@
         ],
         "hit": true,
         "expanded": false,
-        "latency_ms": 126.2
+        "latency_ms": 137.2
       },
       {
         "question": "What are the notification requirements for a personal data breach?",
@@ -125,14 +137,16 @@
         ],
         "retrieved_ids": [
           "Article 33",
+          "Article 34",
           "Article 40",
           "Recital 85",
+          "Recital 86",
           "Recital 87",
           "Recital 88"
         ],
         "hit": true,
         "expanded": true,
-        "latency_ms": 93.2
+        "latency_ms": 96.8
       },
       {
         "question": "What are the obligations for appointing a Data Protection Officer?",
@@ -146,12 +160,14 @@
           "Article 37",
           "Article 38",
           "Article 39",
+          "Article 46",
           "Article 57",
+          "Recital 104",
           "Recital 97"
         ],
         "hit": true,
         "expanded": false,
-        "latency_ms": 106.5
+        "latency_ms": 109.2
       },
       {
         "question": "What are the rules for international data transfers?",
@@ -163,14 +179,16 @@
         ],
         "retrieved_ids": [
           "Article 44",
+          "Article 46",
           "Article 49",
           "Recital 101",
           "Recital 102",
-          "Recital 107"
+          "Recital 107",
+          "Recital 108"
         ],
         "hit": true,
         "expanded": true,
-        "latency_ms": 80.3
+        "latency_ms": 104.7
       },
       {
         "question": "What are the special categories of personal data?",
@@ -181,13 +199,15 @@
         "retrieved_ids": [
           "Article 22",
           "Article 9",
+          "Recital 10",
           "Recital 51",
           "Recital 53",
-          "Recital 71"
+          "Recital 71",
+          "Recital 91"
         ],
         "hit": true,
         "expanded": true,
-        "latency_ms": 85.7
+        "latency_ms": 126.3
       },
       {
         "question": "What rights do data subjects have regarding automated decision making?",
@@ -196,15 +216,17 @@
           "Article 22"
         ],
         "retrieved_ids": [
+          "Article 13",
           "Article 15",
           "Article 21",
           "Article 22",
           "Article 47",
+          "Recital 68",
           "Recital 71"
         ],
         "hit": true,
         "expanded": true,
-        "latency_ms": 65.2
+        "latency_ms": 88.7
       },
       {
         "question": "What is the right to data portability?",
@@ -216,12 +238,14 @@
           "Article 20",
           "Article 23",
           "Article 47",
+          "Recital 108",
+          "Recital 114",
           "Recital 68",
           "Recital 78"
         ],
         "hit": true,
         "expanded": false,
-        "latency_ms": 71.4
+        "latency_ms": 93.1
       },
       {
         "question": "What AI systems are classified as high-risk under the EU AI Act?",
@@ -234,15 +258,17 @@
           "Recital 131"
         ],
         "retrieved_ids": [
+          "Article 6",
           "Recital 131",
           "Recital 166",
           "Recital 173",
           "Recital 51",
-          "Recital 52"
+          "Recital 52",
+          "Recital 62"
         ],
         "hit": true,
         "expanded": false,
-        "latency_ms": 78.8
+        "latency_ms": 112.0
       },
       {
         "question": "What are the prohibited AI practices under the AI Act?",
@@ -252,14 +278,16 @@
         ],
         "retrieved_ids": [
           "Article 5",
+          "Article 50",
           "CHAPTER II",
           "Recital 157",
           "Recital 28",
-          "Recital 31"
+          "Recital 31",
+          "Recital 59"
         ],
         "hit": true,
         "expanded": true,
-        "latency_ms": 93.4
+        "latency_ms": 114.5
       },
       {
         "question": "What transparency obligations apply to AI systems interacting with humans?",
@@ -271,12 +299,14 @@
           "Article 50",
           "CHAPTER IV",
           "Recital 132",
+          "Recital 135",
           "Recital 137",
-          "Recital 27"
+          "Recital 27",
+          "Recital 72"
         ],
         "hit": true,
         "expanded": false,
-        "latency_ms": 60.0
+        "latency_ms": 94.4
       },
       {
         "question": "What are the requirements for general purpose AI models?",
@@ -287,6 +317,8 @@
           "Article 53"
         ],
         "retrieved_ids": [
+          "ANNEX XIII",
+          "Annex XIII",
           "Article 51",
           "Article 52",
           "Article 53",
@@ -295,7 +327,7 @@
         ],
         "hit": true,
         "expanded": true,
-        "latency_ms": 78.6
+        "latency_ms": 105.5
       },
       {
         "question": "What safeguards are required for solely automated decisions with legal effects?",
@@ -305,14 +337,16 @@
         ],
         "retrieved_ids": [
           "Article 13",
+          "Article 15",
           "Article 22",
           "Article 35",
           "Article 47",
-          "Recital 71"
+          "Recital 71",
+          "Recital 91"
         ],
         "hit": true,
         "expanded": true,
-        "latency_ms": 71.2
+        "latency_ms": 148.9
       },
       {
         "question": "What are the obligations of data intermediaries under the Data Governance Act?",
@@ -323,14 +357,16 @@
         ],
         "retrieved_ids": [
           "Article 12",
+          "Article 14",
           "Article 34",
           "Recital 27",
           "Recital 32",
-          "Recital 35"
+          "Recital 35",
+          "Recital 38"
         ],
         "hit": true,
         "expanded": false,
-        "latency_ms": 66.8
+        "latency_ms": 85.1
       },
       {
         "question": "How does GDPR apply to AI systems that process personal data?",
@@ -345,15 +381,145 @@
         "retrieved_ids": [
           "page_11",
           "page_156",
+          "page_159",
           "page_2",
+          "page_3",
           "page_4",
           "page_9"
         ],
         "hit": true,
         "expanded": false,
-        "latency_ms": 76.5
+        "latency_ms": 93.7
       }
     ]
   },
-  "faithfulness": null
+  "faithfulness": {
+    "metric": "faithfulness",
+    "score": 0.874,
+    "n_cases_evaluated": 10,
+    "scores_distribution": {
+      "min": 0.77,
+      "max": 1.0,
+      "mean": 0.874,
+      "median": 0.8675
+    },
+    "cases": [
+      {
+        "supported_claims": 12,
+        "unsupported_claims": 0,
+        "neutral_claims": 6,
+        "faithfulness_score": 1.0,
+        "unsupported_examples": [],
+        "assessment": "All factual claims in the AI answer are directly supported by the provided GDPR sources with accurate citations and no hallucinated content.",
+        "question": "What are the obligations of a data controller under GDPR?"
+      },
+      {
+        "supported_claims": 10,
+        "unsupported_claims": 3,
+        "neutral_claims": 5,
+        "faithfulness_score": 0.77,
+        "unsupported_examples": [
+          "Controllers should establish \"time limits for erasure or for a periodic review\"",
+          "implement appropriate technical and organisational measures for ensuring that, by default, only personal data which are necessary for each specific purpose of the processing are processed",
+          "This obligation applies to \"the amount of personal data collected, the extent of their processing, the period of their storage and their accessibility\""
+        ],
+        "assessment": "The AI answer is largely faithful to the sources but includes some direct quotes and specific details that are not present in the provided source documents.",
+        "question": "What is the principle of data minimisation?"
+      },
+      {
+        "supported_claims": 18,
+        "unsupported_claims": 4,
+        "neutral_claims": 8,
+        "faithfulness_score": 0.82,
+        "unsupported_examples": [
+          "When the processing has multiple purposes, consent should be given for all of them",
+          "When requested by electronic means, the request must be clear, concise and not unnecessarily disruptive to the use of the service for which it is provided",
+          "Consent should not be regarded as freely given if the data subject has no genuine or free choice or is unable to refuse or withdraw consent without detriment",
+          "it shall be as easy to withdraw as to give consent"
+        ],
+        "assessment": "The AI answer is largely faithful to the sources but contains 4 unsupported claims that appear to be inferences or additions not found in the provided GDPR excerpts.",
+        "question": "What constitutes valid consent under GDPR?"
+      },
+      {
+        "supported_claims": 12,
+        "unsupported_claims": 0,
+        "neutral_claims": 8,
+        "faithfulness_score": 1.0,
+        "unsupported_examples": [],
+        "assessment": "All factual claims in the AI answer are directly supported by the provided GDPR sources with accurate quotations and proper attributions.",
+        "question": "What are the lawful bases for processing personal data?"
+      },
+      {
+        "supported_claims": 9,
+        "unsupported_claims": 2,
+        "neutral_claims": 3,
+        "faithfulness_score": 0.82,
+        "unsupported_examples": [
+          "The personal data have been unlawfully processed",
+          "The personal data have to be erased for compliance with a legal obligation in Union or Member State law to which the controller is subject"
+        ],
+        "assessment": "The AI answer is largely faithful to the sources but includes two specific grounds for erasure that are not present in the provided source materials.",
+        "question": "What is the right to erasure under GDPR?"
+      },
+      {
+        "supported_claims": 8,
+        "unsupported_claims": 1,
+        "neutral_claims": 4,
+        "faithfulness_score": 0.89,
+        "unsupported_examples": [
+          "A systematic and extensive evaluation of personal aspects relating to natural persons which is based on automated processing, including profiling, and on which decisions are based that produce legal effects concerning the natural person or similarly significantly affect the natural person [SOURCE 3]."
+        ],
+        "assessment": "The AI answer is largely faithful to the sources but includes one specific DPIA requirement that is not present in the provided source documents.",
+        "question": "When is a Data Protection Impact Assessment required?"
+      },
+      {
+        "supported_claims": 15,
+        "unsupported_claims": 3,
+        "neutral_claims": 8,
+        "faithfulness_score": 0.83,
+        "unsupported_examples": [
+          "Describe the nature of the breach, including where possible the categories and approximate number of affected data subjects and personal data records",
+          "Communicate the name and contact details of the data protection officer or other contact point for more information",
+          "Describe the likely consequences of the breach"
+        ],
+        "assessment": "The AI answer is largely faithful to the sources but includes some specific content requirements for breach notifications that are not fully provided in the truncated source documents.",
+        "question": "What are the notification requirements for a personal data breach?"
+      },
+      {
+        "supported_claims": 6,
+        "unsupported_claims": 1,
+        "neutral_claims": 0,
+        "faithfulness_score": 0.86,
+        "unsupported_examples": [
+          "The controller or the processor shall publish the contact details of the data protection officer and communicate them to the supervisory authority"
+        ],
+        "assessment": "The AI answer is largely faithful to the sources with 6 out of 7 factual claims being directly supported, though one claim about publication and communication obligations appears to be inferred from incomplete source text.",
+        "question": "What are the obligations for appointing a Data Protection Officer?"
+      },
+      {
+        "supported_claims": 14,
+        "unsupported_claims": 2,
+        "neutral_claims": 8,
+        "faithfulness_score": 0.875,
+        "unsupported_examples": [
+          "Standard data protection clauses adopted by a supervisory authority and approved by the Commission",
+          "The controller must assess all circumstances, provide suitable safeguards, inform the supervisory authority, and notify the data subject of the transfer and the compelling legitimate interests pursued"
+        ],
+        "assessment": "The AI answer is largely faithful to the sources with most claims directly supported, but contains two unsupported claims about standard data protection clauses and controller notification requirements not found in the provided sources.",
+        "question": "What are the rules for international data transfers?"
+      },
+      {
+        "supported_claims": 14,
+        "unsupported_claims": 2,
+        "neutral_claims": 5,
+        "faithfulness_score": 0.875,
+        "unsupported_examples": [
+          "authenticate of a natural person",
+          "provided this does not hamper the free flow of personal data within the Union when those conditions apply to cross-border processing"
+        ],
+        "assessment": "The AI answer is largely faithful to the sources with most claims directly supported, but contains minor inaccuracies in technical terminology and adds specific details not present in the provided sources.",
+        "question": "What are the special categories of personal data?"
+      }
+    ]
+  }
 }

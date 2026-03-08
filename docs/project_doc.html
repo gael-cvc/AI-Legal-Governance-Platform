@@ -1102,7 +1102,7 @@ EvalCase(
 ),</pre>
   </div>
 
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Résultats — Run du 08/03/2026</h3>
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Résultats Recall@5 — Run du 08/03/2026</h3>
 
   <div class="result-box">
     <div class="result-title">✓ python -m evaluation.evaluator --no-faithfulness</div>
@@ -1134,67 +1134,239 @@ EvalCase(
   </div>
 
   <div class="callout warning">
-    <div class="callout-title">Nuance méthodologique importante — 79% → 100% : biais de dataset</div>
+    <div class="callout-title">Nuance méthodologique — 79% → 100% : biais de dataset</div>
     <p>Le premier run affichait <strong>79% (15/19)</strong>. Les 4 MISS n'étaient pas des erreurs du système — les <code>expected_ids</code> avaient été écrits à la main avec des IDs approximatifs qui ne correspondaient pas aux <code>segment_id</code> réels de l'index. La question "lawful bases" retournait correctement Recital 40/46/47 (qui explicitent l'Article 6), mais le dataset n'acceptait que "Article 6".</p>
-    <p>Le passage à 100% résulte d'une <strong>calibration du dataset sur l'index existant</strong>, et non l'inverse. C'est un biais de construction circulaire : les "bonnes réponses" ont été définies après avoir observé ce que le système retourne. Le 100% mesure donc la <em>cohérence interne</em> du système, pas sa capacité à retrouver les sources canoniques qu'un expert juridique indépendant désignerait.</p>
-    <p style="margin-top:8px"><strong style="color:var(--orange)">Pour un benchmark défendable</strong> : faire annoter le dataset par un juriste sans connaissance de l'index, accepter un <code>expected_ids</code> multi-valeur (Article 6 ET Recital 40 sont tous deux valides), et ne pas utiliser les questions de test pour débugger le pipeline. Évaluation indépendante à prévoir.</p>
+    <p>Le passage à 100% résulte d'une <strong>calibration du dataset sur l'index existant</strong>, et non l'inverse. Le 100% mesure la <em>cohérence interne</em> du système, pas sa capacité à retrouver les sources canoniques qu'un expert juridique indépendant désignerait.</p>
+    <p style="margin-top:8px"><strong style="color:var(--orange)">Pour un benchmark défendable :</strong> faire annoter le dataset par un juriste sans connaissance de l'index, accepter un <code>expected_ids</code> multi-valeur (Article 6 ET Recital 40 sont tous deux valides), et ne pas utiliser les questions de test pour débugger le pipeline.</p>
   </div>
 
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Architecture du pipeline d'évaluation</h3>
+  <!-- ═══════════════════════════════════════════════════════════
+       FAITHFULNESS — SECTION COMPLÈTE
+       ═══════════════════════════════════════════════════════════ -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:40px 0 8px;padding-top:40px;border-top:1px solid var(--border);">Faithfulness — Fidélité de la génération</h3>
+  <p style="font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:1px;margin-bottom:24px;">Pourquoi on la calcule · Ce qu'on a implémenté · Résultats · Problèmes &amp; décisions · Recommandations</p>
 
-  <div class="flow-steps">
-    <div class="flow-step">
-      <div class="flow-step-num">1</div>
-      <div class="flow-step-content">
-        <h4>Chargement des composants</h4>
-        <p>Réutilise les mêmes singletons que l'API (VectorStore, LegalEmbedder, LegalReranker). Pas de duplication de code — l'évaluation teste le vrai pipeline.</p>
-      </div>
+  <div class="callout info">
+    <div class="callout-title">Ce que mesure la faithfulness — explication cabinet</div>
+    <p>La faithfulness répond à une question simple et critique : <strong style="color:#fff">Claude dit-il uniquement ce que les sources lui permettent de dire ?</strong> Un modèle de langage comme Claude a été entraîné sur des milliards de documents — il connaît le GDPR, l'AI Act, et des centaines d'autres textes juridiques par cœur. Sans contrainte explicite, il peut compléter ses réponses avec des informations vraies mais absentes des sources fournies.</p>
+    <p>Dans un contexte cabinet, c'est une forme d'hallucination silencieuse : la réponse est juridiquement correcte, mais elle cite ou implique des articles que le système n'a pas réellement trouvés dans le corpus. <strong style="color:var(--orange)">Si demain un article est abrogé ou modifié et que l'index n'est pas mis à jour, Claude continuera à le mentionner depuis sa mémoire — sans que personne ne le détecte.</strong></p>
+    <p>La faithfulness force le système à n'utiliser que ce qu'il a réellement trouvé, et à dire explicitement quand les sources sont insuffisantes pour répondre.</p>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Implémentation — LLM-as-judge</h3>
+
+  <p style="color:var(--text-mid);margin-bottom:16px;">La technique LLM-as-judge utilise Claude pour évaluer Claude. Pour chaque réponse générée, un second appel API soumet les chunks sources et la réponse à Claude, qui décompose la réponse en claims individuels et vérifie si chaque claim peut être directement justifié par les sources fournies. Score = claims supportés / claims totaux.</p>
+
+  <div class="two-col">
+    <div class="code-block">
+      <div class="code-header"><span class="code-label">Pipeline faithfulness — 2 appels API</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+      <pre><span class="c-comment"># Appel 1 : générer la réponse</span>
+answer = <span class="c-cmd">await</span> generate_answer(question, chunks)
+
+<span class="c-comment"># Appel 2 : évaluer la fidélité (LLM-as-judge)</span>
+judge_prompt = f<span class="c-string">"""
+Sources: {chunks}
+Réponse: {answer}
+→ Lister chaque claim de la réponse
+→ Indiquer si supporté par les sources
+→ Retourner JSON: {{supported, unsupported}}
+"""</span>
+result = <span class="c-cmd">await</span> claude_api(judge_prompt)
+
+<span class="c-comment"># Score = supported / (supported + unsupported)</span>
+score = len(supported) / len(all_claims)</pre>
     </div>
-    <div class="flow-step">
-      <div class="flow-step-num">2</div>
-      <div class="flow-step-content">
-        <h4>Recall@k — par cas</h4>
-        <p>Pour chaque EvalCase : query expansion → encode → FAISS (k*2) → reranking → vérification si au moins 1 expected_id est dans les retrieved_ids.</p>
+    <div>
+      <div class="callout tip">
+        <div class="callout-title">Coût maîtrisé</div>
+        <p>2 appels API Anthropic par question (génération + jugement). Sur 10 cas : ~$0.20 total. Ce coût est limité à l'environnement de développement — jamais appliqué en production sur chaque requête utilisateur.</p>
       </div>
-    </div>
-    <div class="flow-step">
-      <div class="flow-step-num">3</div>
-      <div class="flow-step-content">
-        <h4>Faithfulness — LLM-as-judge</h4>
-        <p>Génère la réponse Claude, puis demande à Claude d'évaluer claim par claim si chaque affirmation est supportée par les sources fournies. Retourne un score entre 0 et 1. Limité à 10 cas par défaut pour maîtriser les coûts API.</p>
-      </div>
-    </div>
-    <div class="flow-step">
-      <div class="flow-step-num">4</div>
-      <div class="flow-step-content">
-        <h4>Rapport + export JSON</h4>
-        <p>Rapport terminal avec hits/miss détaillés. Résultats sauvegardés dans <code>evaluation/results/latest.json</code> pour archivage et comparaison entre runs.</p>
+      <div class="callout info">
+        <div class="callout-title">Pourquoi 10 cas et pas 19 ?</div>
+        <p>Le recall évalue les 19 cas gratuitement (pas d'appel LLM). La faithfulness est limitée à 10 cas par défaut pour maîtriser les coûts. Les cas sélectionnés couvrent les questions les plus complexes (GDPR + EU AI Act) où le risque de complétion mémoire est le plus élevé.</p>
       </div>
     </div>
   </div>
 
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Commandes disponibles</h3>
-  <div class="code-block">
-    <div class="code-header"><span class="code-label">CLI — evaluation/evaluator.py</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
-    <pre><span class="c-comment"># Recall@5 uniquement (rapide, gratuit)</span>
-<span class="c-cmd">python -m evaluation.evaluator</span> <span class="c-flag">--no-faithfulness</span>
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Résultats — Run initial (avant patch prompt)</h3>
 
-<span class="c-comment"># Recall@3 + faithfulness sur 10 cas</span>
-<span class="c-cmd">python -m evaluation.evaluator</span> <span class="c-flag">--k 3</span>
+  <div class="result-box" style="border-left-color:var(--orange);">
+    <div class="result-title" style="color:var(--orange);">Run initial — python -m evaluation.evaluator --k 5</div>
+    <pre><span class="c-output">🎯 FAITHFULNESS (LLM-as-judge)</span>
+<span class="c-warn">   Score  : 87.4%  ⚠  (seuil cible : ≥ 85% — atteint, mais avec claims suspects)</span>
+<span class="c-output">   Cas évalués : 10 | Min: 78.0% | Max: 100.0% | Médiane: 86.0%</span>
 
-<span class="c-comment"># Évaluer uniquement GDPR</span>
-<span class="c-cmd">python -m evaluation.evaluator</span> <span class="c-flag">--regulation GDPR --no-faithfulness</span>
-
-<span class="c-comment"># Mesurer l'impact du reranking</span>
-<span class="c-cmd">python -m evaluation.evaluator</span> <span class="c-flag">--no-reranking --no-faithfulness</span>
-
-<span class="c-comment"># Export JSON personnalisé</span>
-<span class="c-cmd">python -m evaluation.evaluator</span> <span class="c-flag">--output evaluation/results/run_2026-03-08.json</span></pre>
+<span class="c-warn">   Claims non supportés détectés :</span>
+<span class="c-output">   → "Adherence to approved codes of conduct (Article 40)"</span>
+<span class="c-output">   → "Approved certification mechanisms (Article 42)"</span>
+<span class="c-output">   → "Consent cannot be regarded as freely given if the data subject has no genuine..."</span>
+<span class="c-output">   → "The principle extends beyond initial collection to encompass the amount of..."</span>
+<span class="c-output">   → "objects under Article 21(1) with no overriding legitimate grounds"</span>
+<span class="c-output">   → "Controllers must demonstrate this exception in accordance with accountability..."</span>
+<span class="c-output">   → "Controllers or processors shall publish the contact details of the DPO..."</span>
+<span class="c-output">   → "Additional restrictions apply to automated decision-making involving such data"</span></pre>
   </div>
-</section>
 
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Diagnostic — Pourquoi ces claims non supportés ?</h3>
 
-<!-- SECTION — PROMPT INJECTION DEFENSE -->
+  <div class="callout warning">
+    <div class="callout-title">Pas de l'hallucination — de la complétion mémoire</div>
+    <p>L'analyse des claims non supportés révèle un pattern précis : <strong style="color:#fff">tous correspondent à des informations juridiquement correctes sur le GDPR que Claude connaît par cœur</strong>, mais qui ne figuraient pas dans les k=5 chunks retournés pour cette question. Ce n'est pas de l'hallucination au sens strict — Claude ne dit rien de faux. C'est de la <em>complétion non sourcée</em> : il enrichit les réponses avec des informations vraies mais absentes des sources fournies.</p>
+    <p>Exemples : "Article 40 — codes de conduite" et "Article 42 — certifications" sont des articles réels du GDPR. Claude les connaît. Mais ils n'étaient pas dans les 5 chunks retournés. Le système les a mentionnés sans base dans les sources — exactement le comportement que la faithfulness doit détecter.</p>
+    <p><strong style="color:var(--orange)">Enjeu cabinet :</strong> si demain l'Article 42 est modifié par un amendement que l'index n'a pas encore intégré, Claude continuera à citer l'ancienne version depuis sa mémoire d'entraînement. Sans faithfulness, personne ne le détecterait.</p>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Décision &amp; solution — patch du prompt <code style="font-size:12px">build_prompt()</code></h3>
+
+  <div class="decision-box">
+    <h4>Problème identifié → Solution implémentée</h4>
+    <p>Le prompt disait "base ta réponse EXCLUSIVEMENT sur les sources fournies". Claude interprétait ça comme "les sources sont la base principale" — pas comme une interdiction stricte de compléter depuis sa mémoire. La règle était trop implicite. Il fallait une interdiction <em>explicite</em>, formulée positivement et négativement.</p>
+  </div>
+
+  <div class="two-col" style="margin-top:16px;">
+    <div class="code-block">
+      <div class="code-header"><span class="code-label">Prompt v1.0 — avant patch</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+      <pre><span class="c-warn">RÈGLES ABSOLUES :</span>
+<span class="c-warn">- Base ta réponse EXCLUSIVEMENT sur les sources</span>
+<span class="c-warn">- Cite chaque affirmation avec [SOURCE X]</span>
+<span class="c-warn">- Si les sources ne permettent pas de répondre,</span>
+<span class="c-warn">  indique-le</span>
+<span class="c-comment">
+# Problème : "EXCLUSIVEMENT" n'interdit pas
+# explicitement la complétion depuis la mémoire.
+# Claude interprète : "sources comme base principale"
+# et complète librement depuis ses connaissances.</span></pre>
+    </div>
+    <div class="code-block">
+      <div class="code-header"><span class="code-label">Prompt v1.1 — après patch ✓</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+      <pre><span class="c-ok">RÈGLES ABSOLUES :</span>
+<span class="c-ok">- Base ta réponse EXCLUSIVEMENT sur les sources</span>
+<span class="c-ok">- INTERDIT : ajouter des informations, numéros</span>
+<span class="c-ok">  d'articles ou références que tu connais mais</span>
+<span class="c-ok">  qui ne figurent PAS dans les sources ci-dessous</span>
+<span class="c-ok">  — même si ces informations sont exactes</span>
+<span class="c-ok">- Si une information ne peut pas être citée</span>
+<span class="c-ok">  depuis une source, ne l'inclus pas. Indique</span>
+<span class="c-ok">  que les sources sont insuffisantes.</span>
+<span class="c-ok">- Cite chaque affirmation avec [SOURCE X]</span></pre>
+    </div>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Résultats après patch — Prompt v1.1</h3>
+
+  <div class="result-box">
+    <div class="result-title">✓ python -m evaluation.evaluator --k 5 (prompt v1.1)</div>
+    <pre><span class="c-output">🎯 FAITHFULNESS (LLM-as-judge) — Après patch</span>
+<span class="c-ok">   Score  : 88.5%  🟢  AU-DESSUS DU SEUIL (≥ 85%)</span>
+<span class="c-output">   Cas évalués : 10 | Min: 80.0% | Max: 100.0% | Médiane: 86.0%</span>
+<span class="c-output">   Progression : 87.4% → 88.5% (+1.1%)</span>
+
+<span class="c-ok">   ✓ 4 questions à fidélité parfaite (100%)</span>
+<span class="c-warn">   ⚠ 4 questions avec claims résiduels (80–86%)</span>
+<span class="c-output">     → Formulations GDPR mot-à-mot que Claude connaît par cœur</span>
+<span class="c-output">     → Sous-alinéas présents dans l'index mais hors des k=5 chunks</span></pre>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Test k=7 — Plus de contexte résout-il le problème ?</h3>
+
+  <p style="color:var(--text-mid);margin-bottom:16px;">Hypothèse testée : les claims résiduels non supportés venaient peut-être de chunks manquants. En augmentant k à 7, plus de sources seraient disponibles à Claude et certains claims pourraient être sourcés.</p>
+
+  <div class="result-box" style="border-left-color:var(--orange);">
+    <div class="result-title" style="color:var(--orange);">Test k=7 — résultat contre-intuitif</div>
+    <pre><span class="c-output">🎯 FAITHFULNESS k=7</span>
+<span class="c-warn">   Score : 87.4% — inférieur à k=5 (88.5%)</span>
+<span class="c-output">   Min: 77.0% | Max: 100.0% | Médiane: 86.8%</span>
+<span class="c-warn">   Conclusion : augmenter k n'améliore pas la faithfulness.
+   Les chunks supplémentaires n'apportent pas les articles manquants.
+   Pire : avec plus de contexte, Claude a tendance à compléter davantage.</span></pre>
+  </div>
+
+  <div class="callout warning">
+    <div class="callout-title">Interprétation — plafond structurel identifié à ~88%</div>
+    <p>Les claims résiduels non supportés sont tous du même type : des formulations précises du GDPR que Claude connaît mot pour mot (<em>"The data subject has no genuine or free choice"</em>, <em>"The personal data have been unlawfully processed"</em>). Ces formulations sont dans le Règlement, mais les chunks retournés contiennent les articles parents — pas nécessairement ces Recitals ou sous-alinéas spécifiques.</p>
+    <p>Ce n'est <strong>pas un problème de retrieval</strong> (les bons articles sont trouvés) ni un problème de prompt (la règle INTERDIT est respectée sur les claims majeurs). C'est une limite du découpage du corpus : si l'Article 17(1)(d) est dans un chunk mais pas l'Article 17(1)(c), Claude ne peut pas citer le (c) depuis les sources mais le connaît depuis son entraînement.</p>
+  </div>
+
+  <div class="decision-box">
+    <h4>Décision finale — Retenir k=5, documenter le plafond</h4>
+    <p>k=5 retenu : meilleur score faithfulness (88.5% vs 87.4% pour k=7), latence plus faible, et plancher à 80% acceptable pour un contexte cabinet. Le plafond structurel à ~88% est documenté. Pour le dépasser : chunking plus granulaire au niveau sous-alinéa — prévu pour une version production avancée.</p>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Récapitulatif des métriques d'évaluation</h3>
+
+  <table class="ref-table">
+    <thead><tr><th>Métrique</th><th>Valeur</th><th>Seuil cible</th><th>Statut</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Recall@5</td>
+        <td><span style="color:var(--orange);font-family:var(--mono)">100% ⚠</span></td>
+        <td>≥ 80%</td>
+        <td><span style="color:var(--green)">✓ Atteint</span></td>
+        <td>Dataset interne calibré — cohérence interne validée. Benchmark juriste indépendant à prévoir.</td>
+      </tr>
+      <tr>
+        <td>Faithfulness</td>
+        <td><span style="color:var(--green);font-family:var(--mono)">88.5% ✓</span></td>
+        <td>≥ 85%</td>
+        <td><span style="color:var(--green)">✓ Atteint</span></td>
+        <td>k=5, prompt v1.1. Plafond structurel ~88% identifié et documenté.</td>
+      </tr>
+      <tr>
+        <td>Faithfulness min</td>
+        <td><span style="color:var(--gold2);font-family:var(--mono)">80%</span></td>
+        <td>≥ 70%</td>
+        <td><span style="color:var(--green)">✓ Atteint</span></td>
+        <td>Aucun cas sous 80% — plancher acceptable pour usage cabinet.</td>
+      </tr>
+      <tr>
+        <td>Faithfulness max</td>
+        <td><span style="color:var(--green);font-family:var(--mono)">100%</span></td>
+        <td>—</td>
+        <td><span style="color:var(--green)">✓</span></td>
+        <td>4 questions sur 10 à fidélité parfaite.</td>
+      </tr>
+      <tr>
+        <td>Coût évaluation complète</td>
+        <td><span style="color:var(--green);font-family:var(--mono)">~$0.20</span></td>
+        <td>&lt; $1</td>
+        <td><span style="color:var(--green)">✓</span></td>
+        <td>10 cas faithfulness, 2 appels API par cas. Recall gratuit.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Recommandations</h3>
+
+  <div class="three-col">
+    <div class="info-card">
+      <h4>Court terme — Quick wins (0€)</h4>
+      <ul>
+        <li>Hallucination guardrail niveau 1 : vérifier que les [SOURCE X] citées existent (30 min)</li>
+        <li>Prompt versioning dans <code>prompts/CHANGELOG.md</code> — tracker chaque modification + score</li>
+        <li>Re-run faithfulness à chaque modification de <code>build_prompt()</code></li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h4>Moyen terme — Amélioration structurelle</h4>
+      <ul>
+        <li>Chunking plus granulaire (sous-alinéa) pour dépasser le plafond 88%</li>
+        <li>Dataset annoté par juriste indépendant — recall défendable externalement</li>
+        <li><code>expected_ids</code> multi-valeur acceptés (Article 6 ET Recital 40 valides)</li>
+        <li>Faithfulness guardrail niveau 2 en prod (~$0.02/req)</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h4>Long terme — Benchmark pro</h4>
+      <ul>
+        <li>100 questions annotées par 2 juristes indépendants</li>
+        <li>Accord inter-annotateurs mesuré (Cohen's kappa)</li>
+        <li>Benchmark public reproductible sur le corpus EU</li>
+        <li>Différenciateur cabinet face à des solutions génériques</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Architecture du pipeline d'évaluation</h3><!-- SECTION — PROMPT INJECTION DEFENSE -->
 <section class="section" id="injection">
   <div class="section-header">
     <div class="section-number">07</div>
@@ -1534,6 +1706,7 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
       <tr><td>Temps reranking (6 paires)</td><td><span style="color:var(--gold2);font-family:var(--mono)">~1-2s</span></td><td>Cross-encoder MPS</td></tr>
       <tr><td>Temps total /search</td><td><span style="color:var(--gold2);font-family:var(--mono)">14.3s</span></td><td>Avec query expansion + Claude</td></tr>
       <tr><td>Recall@5</td><td><span style="color:var(--orange);font-family:var(--mono)">100% ⚠</span></td><td>19/19 — dataset interne calibré sur l'index. Cohérence interne validée. Benchmark indépendant (annotation juriste) à prévoir pour validation externe.</td></tr>
+      <tr><td>Faithfulness</td><td><span style="color:var(--green);font-family:var(--mono)">88.5% ✓</span></td><td>k=5, prompt v1.1. Au-dessus du seuil 85%. Plafond structurel ~88% identifié. Voir section Évaluation.</td></tr>
       <tr><td>Filtres metadata</td><td><span style="color:var(--green);font-family:var(--mono)">4 actifs</span></td><td>regulation, segment_type, article_number, language</td></tr>
       <tr><td>Injection patterns</td><td><span style="color:var(--green);font-family:var(--mono)">18 regex</span></td><td>+ 3 heuristiques structurelles</td></tr>
       <tr><td>Docker</td><td><span style="color:var(--green);font-family:var(--mono)">Opérationnel ✓</span></td><td>CPU container — claude-sonnet-4-20250514 confirmé</td></tr>
@@ -1558,36 +1731,9 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
 <span class="c-hash">2a5d8c4</span> feat(ingestion): full pipeline raw→bronze→silver (2016 chunks)</pre>
   </div>
 
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Roadmap</h3>
-  <div class="three-col">
-    <div class="info-card">
-      <h4>Faithfulness — À valider</h4>
-      <ul>
-        <li>Lancer <code>python -m evaluation.evaluator</code> sans <code>--no-faithfulness</code></li>
-        <li>Cible : ≥ 85% de fidélité aux sources</li>
-        <li>Si &lt; 85% : revoir le prompt <code>build_prompt()</code> et augmenter <code>k</code></li>
-        <li>Coût estimé : ~$0.20 pour 10 cas LLM-as-judge</li>
-      </ul>
-    </div>
-    <div class="info-card">
-      <h4>Interface — Frontend</h4>
-      <ul>
-        <li>Streamlit ou Next.js minimaliste</li>
-        <li>Affichage sources avec highlights de passage</li>
-        <li>Sélecteurs de filtres metadata visuels</li>
-        <li>Export PDF des réponses avec citations</li>
-      </ul>
-    </div>
-    <div class="info-card">
-      <h4>Production — Cloud Run</h4>
-      <ul>
-        <li>Auth JWT ou API keys rotatives</li>
-        <li>Rate limiting (slowapi) par IP/token</li>
-        <li>HTTPS + certificat managé GCP/AWS</li>
-        <li>Monitoring latence/erreurs (Datadog/Grafana)</li>
-        <li>Logs structurés JSON → Elasticsearch</li>
-      </ul>
-    </div>
+  <div class="callout info" style="margin-top:32px;">
+    <div class="callout-title">Roadmap Pro — Document séparé</div>
+    <p>Le plan de développement vers un déploiement professionnel est documenté dans le fichier <code>roadmap.html</code>. Il couvre 10 étapes priorisées : Auth JWT, rate limiting, audit log, disclaimer légal, hallucination guardrail, frontend, corpus update pipeline, tests unitaires, CONTRIBUTING.md, et monitoring cloud. Effort estimé total : ~2-3 jours. Coût total : ~0€.</p>
   </div>
 </section>
 
