@@ -1128,13 +1128,16 @@ EvalCase(
 <span class="c-ok">  [18/19] ✓ HIT | ALL        | What are the obligations of data intermediaries (DGA)?</span>
 <span class="c-ok">  [19/19] ✓ HIT | ALL        | How does GDPR apply to AI systems that process personal data?</span>
 
-<span class="c-ok">📊 RECALL@5 : 100.0%  🟢 BON</span>
-<span class="c-output">   Hits   : 19 / 19 | Reranking : activé</span></pre>
+<span class="c-ok">📊 RECALL@5 : 100.0%  🟢  (dataset interne calibré)</span>
+<span class="c-output">   Hits   : 19 / 19 | Reranking : activé</span>
+<span class="c-warn">   ⚠ Score mesurant la cohérence interne — voir nuance méthodologique ci-dessous</span></pre>
   </div>
 
-  <div class="callout tip">
-    <div class="callout-title">Note sur le premier run — 79% → 100%</div>
-    <p>Le premier run affichait 79% (15/19). Les 4 MISS n'étaient pas des erreurs du système — les expected_ids du dataset ne correspondaient pas aux segment_id réels dans l'index. Par exemple, la question "lawful bases" retournait correctement les Recitals 40/46/47 qui expliquent l'Article 6, mais le dataset n'acceptait que "Article 6". Après calibration du dataset sur les vrais IDs de l'index, le score est passé à 100%.</p>
+  <div class="callout warning">
+    <div class="callout-title">Nuance méthodologique importante — 79% → 100% : biais de dataset</div>
+    <p>Le premier run affichait <strong>79% (15/19)</strong>. Les 4 MISS n'étaient pas des erreurs du système — les <code>expected_ids</code> avaient été écrits à la main avec des IDs approximatifs qui ne correspondaient pas aux <code>segment_id</code> réels de l'index. La question "lawful bases" retournait correctement Recital 40/46/47 (qui explicitent l'Article 6), mais le dataset n'acceptait que "Article 6".</p>
+    <p>Le passage à 100% résulte d'une <strong>calibration du dataset sur l'index existant</strong>, et non l'inverse. C'est un biais de construction circulaire : les "bonnes réponses" ont été définies après avoir observé ce que le système retourne. Le 100% mesure donc la <em>cohérence interne</em> du système, pas sa capacité à retrouver les sources canoniques qu'un expert juridique indépendant désignerait.</p>
+    <p style="margin-top:8px"><strong style="color:var(--orange)">Pour un benchmark défendable</strong> : faire annoter le dataset par un juriste sans connaissance de l'index, accepter un <code>expected_ids</code> multi-valeur (Article 6 ET Recital 40 sont tous deux valides), et ne pas utiliser les questions de test pour débugger le pipeline. Évaluation indépendante à prévoir.</p>
   </div>
 
   <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Architecture du pipeline d'évaluation</h3>
@@ -1530,7 +1533,7 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
       <tr><td>Latence FAISS search</td><td><span style="color:var(--green);font-family:var(--mono)">&lt; 5ms</span></td><td>2016 vecteurs, exact</td></tr>
       <tr><td>Temps reranking (6 paires)</td><td><span style="color:var(--gold2);font-family:var(--mono)">~1-2s</span></td><td>Cross-encoder MPS</td></tr>
       <tr><td>Temps total /search</td><td><span style="color:var(--gold2);font-family:var(--mono)">14.3s</span></td><td>Avec query expansion + Claude</td></tr>
-      <tr><td>Recall@5</td><td><span style="color:var(--green);font-family:var(--mono)">100% ✓</span></td><td>19/19 — dataset calibré sur l'index réel</td></tr>
+      <tr><td>Recall@5</td><td><span style="color:var(--orange);font-family:var(--mono)">100% ⚠</span></td><td>19/19 — dataset interne calibré sur l'index. Cohérence interne validée. Benchmark indépendant (annotation juriste) à prévoir pour validation externe.</td></tr>
       <tr><td>Filtres metadata</td><td><span style="color:var(--green);font-family:var(--mono)">4 actifs</span></td><td>regulation, segment_type, article_number, language</td></tr>
       <tr><td>Injection patterns</td><td><span style="color:var(--green);font-family:var(--mono)">18 regex</span></td><td>+ 3 heuristiques structurelles</td></tr>
       <tr><td>Docker</td><td><span style="color:var(--green);font-family:var(--mono)">Opérationnel ✓</span></td><td>CPU container — claude-sonnet-4-20250514 confirmé</td></tr>
