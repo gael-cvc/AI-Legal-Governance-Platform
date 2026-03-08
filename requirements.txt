@@ -10,3 +10,4 @@ pandas
 tiktoken
 python-dotenv
 regex
+anthropic
