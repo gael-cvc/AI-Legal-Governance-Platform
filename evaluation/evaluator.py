@@ -575,7 +575,7 @@ def main():
         help="Nombre max de cas pour faithfulness (défaut: 10, pour maîtriser les coûts)"
     )
     parser.add_argument(
-        "--output", type=str, default="eval/results/latest.json",
+        "--output", type=str, default="evaluation/results/latest.json",
         help="Chemin du fichier JSON de résultats (défaut: eval/results/latest.json)"
     )
 
