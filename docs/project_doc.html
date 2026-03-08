@@ -175,6 +175,7 @@ pre { padding:20px 24px; font-family:var(--mono); font-size:12px; line-height:1.
     <a class="nav-item" href="#metadata-filters">Étape 5 — Metadata Filtering</a>
     <a class="nav-item" href="#evaluation">Étape 6 — Évaluation RAG</a>
     <a class="nav-item" href="#injection">Étape 7 — Injection Defense</a>
+    <a class="nav-item" href="#docker">Étape 8 — Docker & Déploiement</a>
   </div>
   <div class="nav-section">
     <div class="nav-section-title">Bilan</div>
@@ -186,15 +187,16 @@ pre { padding:20px 24px; font-family:var(--mono); font-size:12px; line-height:1.
 
 <!-- HERO -->
 <div class="hero">
-  <div class="hero-tag">Documentation Technique · v2.0</div>
+  <div class="hero-tag">Documentation Technique · v3.0</div>
   <h1>AI Legal <span>Governance</span><br>Intelligence Platform</h1>
-  <p class="hero-sub">Architecture complète d'un système RAG (Retrieval-Augmented Generation) appliqué au droit européen. Chaque décision technique documentée, justifiée, et mise en perspective selon les contextes d'usage — du prototype au déploiement entreprise.</p>
+  <p class="hero-sub">Architecture complète d'un système RAG (Retrieval-Augmented Generation) appliqué au droit européen. Chaque décision technique documentée, justifiée, et mise en perspective selon les contextes d'usage — du prototype au déploiement containerisé.</p>
   <div class="hero-meta">
-    <div class="hero-meta-item"><strong>7</strong>étapes</div>
+    <div class="hero-meta-item"><strong>8</strong>étapes</div>
     <div class="hero-meta-item"><strong>2016</strong>vecteurs</div>
     <div class="hero-meta-item"><strong>8</strong>PDFs légaux</div>
     <div class="hero-meta-item"><strong>384</strong>dimensions</div>
     <div class="hero-meta-item"><strong>100%</strong>recall@5</div>
+    <div class="hero-meta-item"><strong>Docker</strong>ready</div>
     <div class="hero-meta-item"><strong>Claude</strong>Sonnet 4</div>
   </div>
 </div>
@@ -228,8 +230,9 @@ pre { padding:20px 24px; font-family:var(--mono); font-size:12px; line-height:1.
       <tr><td>Reranker</td><td><span class="badge orange">ms-marco-MiniLM-L-6-v2</span></td><td>Cohere Rerank, bge-reranker</td><td>67MB, local, cross-encoder précis, gratuit</td></tr>
       <tr><td>API</td><td><span class="badge green">FastAPI</span></td><td>Flask, Django REST</td><td>Async natif, OpenAPI auto-généré, type hints, lifespan hooks pour singletons</td></tr>
       <tr><td>PDF parsing</td><td><span class="badge gold">PyMuPDF</span></td><td>pdfplumber, pypdf2</td><td>Le plus rapide, meilleure extraction sur PDFs légaux EU multi-langues</td></tr>
-      <tr><td>Runtime</td><td><span class="badge blue">Python 3.12 + venv</span></td><td>Docker, conda</td><td>Prototype local, portabilité simple, pas de surcharge infra</td></tr>
-      <tr><td>Accélération</td><td><span class="badge purple">MPS (Apple Silicon)</span></td><td>CPU, CUDA</td><td>Mac M4 — MPS = 3-5x plus rapide que CPU pour sentence-transformers</td></tr>
+      <tr><td>Runtime local</td><td><span class="badge blue">Python 3.12 + venv</span></td><td>conda</td><td>Développement local sur Mac M4. Variables d'env via <code style="font-family:var(--mono);font-size:10px;background:var(--bg3);padding:1px 4px;color:var(--gold2)">.env</code>, modèles HuggingFace en cache, hot-reload FastAPI.</td></tr>
+      <tr><td>Déploiement</td><td><span class="badge purple">Docker + Compose</span></td><td>Fly.io, Railway direct</td><td>Standard industrie. Portabilité garantie Mac→Linux→Cloud. Volumes pour FAISS et modèles. Variable <code style="font-family:var(--mono);font-size:10px;background:var(--bg3);padding:1px 4px;color:var(--gold2)">DEVICE</code> adaptative (mps local, cpu conteneur).</td></tr>
+      <tr><td>Accélération</td><td><span class="badge purple">MPS / CPU (env var)</span></td><td>CPU fixe</td><td>Mac M4 — <code style="font-family:var(--mono);font-size:10px;background:var(--bg3);padding:1px 4px;color:var(--gold2)">DEVICE=mps</code> en local (3-5x plus rapide), <code style="font-family:var(--mono);font-size:10px;background:var(--bg3);padding:1px 4px;color:var(--gold2)">DEVICE=cpu</code> dans Docker. Un seul codebase, comportement adaptatif via <code style="font-family:var(--mono);font-size:10px;background:var(--bg3);padding:1px 4px;color:var(--gold2)">os.getenv()</code>.</td></tr>
     </tbody>
   </table>
 
@@ -1301,13 +1304,184 @@ is_injection, reason = detect_prompt_injection(request.question)
 </section>
 
 
+<!-- SECTION — DOCKER -->
+<section class="section" id="docker">
+  <div class="section-header">
+    <div class="section-number">08</div>
+    <div class="section-title-block">
+      <h2>Étape 8 — Docker & Déploiement</h2>
+      <p>Containerisation · DEVICE env var · Cache modèles · Portabilité Mac → Cloud</p>
+    </div>
+  </div>
+
+  <p style="color:var(--text-mid);margin-bottom:28px;">Jusqu'ici, le projet tournait exclusivement en local sur Mac M4 avec un venv Python. La containerisation Docker est l'étape qui transforme un prototype en quelque chose de <strong style="color:#fff">portable et déployable</strong> — sur n'importe quelle machine Linux, Cloud Run, Fly.io, ou VPS. Elle introduit un problème central que nous avons dû résoudre : le MPS d'Apple n'existe pas dans un conteneur Linux.</p>
+
+  <div class="decision-box">
+    <h4>Le problème fondamental — device="mps" dans Docker Linux</h4>
+    <p>MPS (Metal Performance Shaders) est l'API GPU d'Apple Silicon. Elle est disponible sur Mac natif, mais <strong>inexistante dans un conteneur Linux</strong>. Sans correction, docker compose up crashait dès le chargement des modèles avec <code style="font-family:var(--mono);font-size:11px;background:var(--bg3);padding:1px 4px;color:var(--gold2)">RuntimeError: MPS framework not found</code>. La solution ne doit pas forcer CPU partout (ça pénaliserait le dev local) ni introduire une détection automatique fragile.</p>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Solution — Variable d'environnement DEVICE</h3>
+
+  <div class="two-col">
+    <div class="callout info">
+      <div class="callout-title">Principe — Configuration via environnement</div>
+      <p>Au lieu de hardcoder <code>"mps"</code> ou de détecter dynamiquement le device, on externalise la décision dans une variable d'environnement. Le code reste identique partout — c'est l'environnement qui dit quel hardware utiliser. C'est le principe "12-factor app" (factor III : config in the environment).</p>
+    </div>
+    <div class="callout warning">
+      <div class="callout-title">Pourquoi pas la détection automatique ?</div>
+      <p><code>torch.backends.mps.is_available()</code> peut retourner des résultats incohérents selon la version PyTorch et l'environnement. Dans certains conteneurs, la détection retourne True mais l'inférence crash. Une variable explicite est <strong>déterministe</strong> et ne dépend d'aucune heuristique de bibliothèque tierce.</p>
+    </div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">embedder.py et reranker.py — Pattern DEVICE</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-comment"># Avant — hardcodé, crash dans Docker</span>
+model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, device=<span class="c-string">"mps"</span>)
+
+<span class="c-comment"># Après — flexible, fonctionne partout</span>
+<span class="c-flag">import</span> os
+device = os.getenv(<span class="c-string">"DEVICE"</span>, <span class="c-string">"mps"</span>)   <span class="c-comment"># défaut : mps (Mac local)</span>
+logger.info(<span class="c-string">f"Device : {device}"</span>)
+model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, device=device)
+
+<span class="c-comment"># Résultat :</span>
+<span class="c-comment"># · En local (Mac M4) : DEVICE non défini → "mps" → 3-5x plus rapide</span>
+<span class="c-comment"># · Dans Docker Linux : DEVICE=cpu injecté par compose → stable, portable</span>
+<span class="c-comment"># · Sur NVIDIA GPU : DEVICE=cuda → zero changement de code</span></pre>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Architecture des 4 fichiers Docker</h3>
+
+  <div class="two-col">
+    <div class="info-card">
+      <h4>Dockerfile — Décisions clés</h4>
+      <ul>
+        <li><code>python:3.12-slim</code> — ~120MB vs 900MB pour full. Pas de compilateurs C inutiles.</li>
+        <li>COPY <code>requirements.txt</code> en premier — layer Docker en cache si les dépendances ne changent pas. Build 10x plus rapide lors d'un simple changement de code.</li>
+        <li><code>HEALTHCHECK</code> sur <code>/health</code> — Docker restart automatique si l'API crash, sans intervention manuelle.</li>
+        <li><code>EXPOSE 8000</code> — documentation du port pour les outils d'orchestration, pas un vrai firewall.</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h4>docker-compose.yml — Volumes critiques</h4>
+      <ul>
+        <li><code>./data:/app/data:ro</code> — index FAISS monté en lecture seule (protection contre une écriture accidentelle depuis le conteneur).</li>
+        <li><code>./models_cache:/root/.cache/huggingface</code> — cache des modèles persistant entre les redémarrages. Sans ça, Docker retélécharge 160MB à chaque rebuild.</li>
+        <li><code>env_file: .env</code> — injection de l'API key sans la mettre dans l'image (qui pourrait être poussée sur Docker Hub).</li>
+        <li><code>TRANSFORMERS_OFFLINE=1</code> — force l'utilisation du cache local. Bloque tout accès réseau vers HuggingFace Hub en production.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="info-card">
+      <h4>.dockerignore — Optimisation build</h4>
+      <p>Exclure du contexte de build réduit le temps de transfert et la taille de l'image :</p>
+      <ul>
+        <li><code>venv/</code> — ~800MB de dépendances Python locales</li>
+        <li><code>data/raw/</code> — PDFs sources (~45MB, montés en volume)</li>
+        <li><code>models_cache/</code> — modèles HuggingFace (~250MB, montés en volume)</li>
+        <li><code>.env</code> — <strong>CRITIQUE</strong> : contient l'API key Anthropic</li>
+        <li><code>__pycache__/, .git/</code> — artefacts inutiles</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h4>.env.example — Documentation configuration</h4>
+      <p>Versionné dans Git (contrairement à <code>.env</code>). Sert de documentation vivante des variables d'environnement requises :</p>
+      <ul>
+        <li><code>ANTHROPIC_API_KEY=sk-ant-...</code></li>
+        <li><code>DEVICE=cpu</code></li>
+        <li><code>MIN_SCORE=0.35</code></li>
+        <li><code>DEFAULT_K=5</code></li>
+        <li><code>TRANSFORMERS_OFFLINE=1</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Bug résolu — Package 'anthropic' manquant dans l'image</h3>
+
+  <div style="margin-bottom:24px;">
+    <div class="callout danger">
+      <div class="callout-title">Symptôme — Fallback silencieux sans LLM</div>
+      <p>Après le premier <code>docker compose up --build</code>, toutes les réponses <code>POST /search</code> retournaient <code>"model_used": "fallback-no-llm"</code> avec les chunks bruts mais sans synthèse Claude — malgré une clé API valide confirmée par <code>/health</code>.</p>
+    </div>
+    <div class="callout warning">
+      <div class="callout-title">Diagnostic — Module Python manquant dans l'image</div>
+      <p>Les logs Docker révélaient : <code style="font-family:var(--mono);font-size:11px;background:var(--bg3);padding:1px 4px;color:var(--gold2)">WARNING | api.search | Génération LLM échouée : No module named 'anthropic'</code>. Le package <code>anthropic</code> était installé dans le venv local (via <code>pip install anthropic</code> au cours du développement) mais n'avait jamais été ajouté à <code>requirements.txt</code>. Le venv local et l'image Docker divergeaient silencieusement.</p>
+    </div>
+    <div class="callout tip">
+      <div class="callout-title">Fix & Leçon permanente</div>
+      <p>Fix immédiat : <code>echo "anthropic" >> requirements.txt</code> + <code>docker compose up --build</code>. Leçon à retenir : <strong>toujours reconstruire l'image depuis zéro</strong> après tout <code>pip install</code> en développement pour détecter les dérives entre venv et <code>requirements.txt</code>. La commande canonique est <code>pip freeze > requirements.txt</code> avant chaque containerisation.</p>
+    </div>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Procédure de déploiement complète</h3>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">Déploiement pas-à-pas</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-comment"># ── Pré-requis : pré-remplir le cache modèles (une seule fois) ──────</span>
+<span class="c-cmd">mkdir</span> <span class="c-flag">-p</span> models_cache
+<span class="c-cmd">cp</span> <span class="c-flag">-r</span> ~/.cache/huggingface/* models_cache/
+<span class="c-comment"># → ~250MB copiés localement, Docker ne télécharge plus rien</span>
+
+<span class="c-comment"># ── Configuration secrets ────────────────────────────────────────────</span>
+<span class="c-cmd">cp</span> .env.example .env
+<span class="c-comment"># Éditer .env : ANTHROPIC_API_KEY=sk-ant-api03-...</span>
+
+<span class="c-comment"># ── Build et démarrage ───────────────────────────────────────────────</span>
+<span class="c-cmd">docker compose up</span> <span class="c-flag">--build</span>
+<span class="c-output">✔ Container ai-legal-platform  Started</span>
+
+<span class="c-comment"># ── Validation (nouveau terminal) ───────────────────────────────────</span>
+<span class="c-cmd">curl</span> http://localhost:8000/health
+<span class="c-ok">{
+  "status": "ok",
+  "index_loaded": true,
+  "n_vectors": 2016,
+  "device": "cpu",
+  "regulations": ["CNIL","DATA_GOVERNANCE_ACT","EDPB","EU_AI_ACT","GDPR"]
+}</span>
+
+<span class="c-comment"># ── Test requête complète ────────────────────────────────────────────</span>
+<span class="c-cmd">curl</span> <span class="c-flag">-X POST</span> http://localhost:8000/search \
+  <span class="c-flag">-H</span> <span class="c-string">"Content-Type: application/json"</span> \
+  <span class="c-flag">-d</span> <span class="c-string">'{"question":"What are the obligations of a data controller?"}'</span>
+
+<span class="c-ok">→ "model_used": "claude-sonnet-4-20250514" ✓</span>
+<span class="c-comment"># Réponse complète avec citations exactes ✓</span>
+<span class="c-comment"># Temps total : ~13s (CPU dans Docker vs 14.3s MPS local — comparable)</span></pre>
+  </div>
+
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Comparaison des environnements</h3>
+
+  <div class="scale-grid">
+    <div class="scale-card our">
+      <div class="scale-tag">✦ Dev local — Mac M4 + venv</div>
+      <h5>DEVICE=mps · Hot-reload</h5>
+      <p>Démarrage instantané, hot-reload FastAPI (<code>--reload</code>), MPS 3-5x plus rapide. <code>TRANSFORMERS_OFFLINE=1</code> évite les appels réseau intempestifs. Idéal pour développer et tester.</p>
+    </div>
+    <div class="scale-card pro">
+      <div class="scale-tag">◈ Docker local — Validation prod</div>
+      <h5>DEVICE=cpu · Image reproductible</h5>
+      <p>Valide que l'image fonctionne sans dépendances locales implicites. CPU légèrement plus lent mais comportement identique à la production. Cible pour les démos et revues de code.</p>
+    </div>
+    <div class="scale-card big">
+      <div class="scale-tag">⬡ Cloud Run / Fly.io — Production</div>
+      <h5>DEVICE=cpu · HTTPS · Auth</h5>
+      <p>Mêmes Dockerfile + compose. Ajouter : Auth JWT ou API keys, rate limiting (slowapi), HTTPS terminé par le load balancer, monitoring Datadog/Grafana, logs structurés JSON.</p>
+    </div>
+  </div>
+</section>
+
+
 <!-- SECTION — RÉSULTATS -->
 <section class="section" id="results">
   <div class="section-header">
     <div class="section-number">08</div>
     <div class="section-title-block">
       <h2>Résultats Finaux & État du Projet</h2>
-      <p>Validation complète · Métriques · État v2.0</p>
+      <p>Validation complète · Métriques · État v3.0</p>
     </div>
   </div>
 
@@ -1359,13 +1533,17 @@ is_injection, reason = detect_prompt_injection(request.question)
       <tr><td>Recall@5</td><td><span style="color:var(--green);font-family:var(--mono)">100% ✓</span></td><td>19/19 — dataset calibré sur l'index réel</td></tr>
       <tr><td>Filtres metadata</td><td><span style="color:var(--green);font-family:var(--mono)">4 actifs</span></td><td>regulation, segment_type, article_number, language</td></tr>
       <tr><td>Injection patterns</td><td><span style="color:var(--green);font-family:var(--mono)">18 regex</span></td><td>+ 3 heuristiques structurelles</td></tr>
+      <tr><td>Docker</td><td><span style="color:var(--green);font-family:var(--mono)">Opérationnel ✓</span></td><td>CPU container — claude-sonnet-4-20250514 confirmé</td></tr>
+      <tr><td>Temps total /search (Docker)</td><td><span style="color:var(--gold2);font-family:var(--mono)">~13s</span></td><td>DEVICE=cpu — comparable au local MPS</td></tr>
     </tbody>
   </table>
 
   <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">État Git — main branch</h3>
   <div class="code-block">
     <div class="code-header"><span class="code-label">git log --oneline</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
-    <pre><span class="c-hash">f3a1e9c</span> <span class="c-ok">eval: fix dataset expected_ids + default output path → 100% recall@5</span>
+    <pre><span class="c-hash">latest </span> <span class="c-ok">fix(docker): add anthropic to requirements.txt — LLM fallback résolu</span>
+<span class="c-hash">9d479dc</span> feat(docker): Dockerfile + compose + .dockerignore + .env.example
+<span class="c-hash">f3a1e9c</span> eval: fix dataset expected_ids + default output path → 100% recall@5
 <span class="c-hash">e7d2b8f</span> feat(security): add prompt injection defense with regex + structural heuristics
 <span class="c-hash">d4c9a12</span> feat(eval): add recall@k and faithfulness evaluation pipeline
 <span class="c-hash">c1f8e34</span> feat(search): add metadata filters — segment_type, article_number, language
@@ -1384,26 +1562,27 @@ is_injection, reason = detect_prompt_injection(request.question)
       <ul>
         <li>Lancer <code>python -m evaluation.evaluator</code> sans <code>--no-faithfulness</code></li>
         <li>Cible : ≥ 85% de fidélité aux sources</li>
-        <li>Si &lt; 85% : revoir le prompt <code>build_prompt()</code></li>
-        <li>Coût estimé : ~$0.20 pour 10 cas</li>
-      </ul>
-    </div>
-    <div class="info-card">
-      <h4>Docker — Containerisation</h4>
-      <ul>
-        <li>Dockerfile multi-stage (build + runtime)</li>
-        <li>docker-compose avec volume pour data/</li>
-        <li>Variables d'env via .env</li>
-        <li>Cible : déploiement Cloud Run ou Fly.io</li>
+        <li>Si &lt; 85% : revoir le prompt <code>build_prompt()</code> et augmenter <code>k</code></li>
+        <li>Coût estimé : ~$0.20 pour 10 cas LLM-as-judge</li>
       </ul>
     </div>
     <div class="info-card">
       <h4>Interface — Frontend</h4>
       <ul>
         <li>Streamlit ou Next.js minimaliste</li>
-        <li>Affichage sources avec highlights</li>
-        <li>Sélecteurs de filtres metadata</li>
-        <li>Export PDF des réponses</li>
+        <li>Affichage sources avec highlights de passage</li>
+        <li>Sélecteurs de filtres metadata visuels</li>
+        <li>Export PDF des réponses avec citations</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h4>Production — Cloud Run</h4>
+      <ul>
+        <li>Auth JWT ou API keys rotatives</li>
+        <li>Rate limiting (slowapi) par IP/token</li>
+        <li>HTTPS + certificat managé GCP/AWS</li>
+        <li>Monitoring latence/erreurs (Datadog/Grafana)</li>
+        <li>Logs structurés JSON → Elasticsearch</li>
       </ul>
     </div>
   </div>
@@ -1413,7 +1592,7 @@ is_injection, reason = detect_prompt_injection(request.question)
 <div class="footer">
   <div class="footer-left">
     AI Legal Governance Platform<br>
-    Python 3.12 · FastAPI · FAISS · Claude Sonnet 4<br>
+    Python 3.12 · FastAPI · FAISS · Claude Sonnet 4 · Docker<br>
     github.com/gael-cvc/AI-Legal-Governance-Platform
   </div>
   <div class="footer-right">
