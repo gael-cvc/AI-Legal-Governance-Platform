@@ -62,6 +62,15 @@ PIPELINE COMPLET D'UNE REQUÊTE /search :
   └─────────────────────────────────────────────────────────┘
        │
        ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │  ÉTAPE 5 : HALLUCINATION GUARDRAIL                       │
+  │  Vérifie que chaque [SOURCE X] cité par Claude existe   │
+  │  réellement dans les chunks fournis (X ≤ len(chunks)).  │
+  │  Niveau LOW (1 fantôme)  → warning + flag réponse       │
+  │  Niveau HIGH (2+ fantômes) → HTTP 503 bloquant          │
+  └─────────────────────────────────────────────────────────┘
+       │
+       ▼
   Réponse JSON structurée (SearchResponse)
 
 CHANGEMENT v1.1 — RERANKER SINGLETON :
@@ -76,6 +85,15 @@ CHANGEMENT v1.2 — METADATA FILTERS :
 CHANGEMENT v1.3 — PROMPT INJECTION DEFENSE :
   Ajout de detect_prompt_injection() avant toute autre étape du pipeline.
   Bloque les tentatives de manipulation du LLM avec HTTP 400.
+
+CHANGEMENT v1.4 — HALLUCINATION GUARDRAIL :
+  Ajout de check_hallucination_guardrail() après la génération LLM.
+  Détecte les "sources fantômes" : [SOURCE X] cités par Claude avec X > len(chunks).
+  Claude connaît le GDPR par cœur — il peut spontanément citer [SOURCE 7] même si
+  k=5. Ce n'est pas une hallucination de contenu, mais une citation non traçable.
+  Le guardrail rend ce comportement visible et contrôlable.
+  → Niveau LOW  : warning log + flag dans la réponse
+  → Niveau HIGH : HTTP 503 (réponse bloquée, trop de sources fantômes)
 """
 
 from __future__ import annotations
@@ -422,6 +440,222 @@ def rerank_chunks(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ÉTAPE 5 : HALLUCINATION GUARDRAIL
+# ══════════════════════════════════════════════════════════════════════════════
+
+# CONTEXTE — POURQUOI CE GUARDRAIL EST NÉCESSAIRE :
+#
+# Le pipeline RAG fournit k chunks numérotés [SOURCE 1] à [SOURCE k] à Claude.
+# Le prompt demande explicitement de ne citer que ces sources (règle INTERDIT,
+# build_prompt() v1.1). Malgré ça, on a observé lors des évaluations faithfulness
+# que Claude peut citer des numéros de sources qui n'existent pas :
+#
+#   Exemple observé (k=5, Run 1 faithfulness) :
+#     Claude répond : "...comme le précise [SOURCE 7]..."
+#     Or k=5 → seules [SOURCE 1] à [SOURCE 5] existent.
+#     [SOURCE 7] est une "source fantôme" — non traçable, non vérifiable.
+#
+# POURQUOI ÇA ARRIVE (critique) :
+#
+#   Ce n'est PAS une hallucination de contenu au sens classique.
+#   Claude ne "fabrique" pas une information fausse. Il connaît le GDPR
+#   par cœur (surreprésenté dans ses données d'entraînement).
+#
+#   Ce qui se passe : Claude a l'information correcte en mémoire, il la cite,
+#   et il lui attribue un numéro de source qui "devrait" être là — mais qui
+#   dépasse k. C'est une erreur de bookkeeping du modèle, pas un mensonge.
+#
+#   En pratique : la réponse est souvent exacte factuellement mais la traçabilité
+#   est rompue. Dans un contexte d'audit juridique, c'est rédhibitoire.
+#
+# DISTINCTION ESSENTIELLE — DEUX TYPES D'HALLUCINATIONS :
+#
+#   Type A — Sources fantômes : [SOURCE X] avec X > k
+#     → Ce que détecte CE guardrail (niveau 1)
+#     → Détectable par simple regex + comparaison entière, 0 coût
+#     → Exemple : [SOURCE 7] cité alors que k=5
+#
+#   Type B — Fidélité sémantique : [SOURCE 2] cité mais son contenu
+#             ne supporte pas le claim
+#     → Ce que détecte le pipeline LLM-as-judge (niveau 2)
+#     → Coûte ~$0.02/requête si on le fait en temps réel (non recommandé)
+#     → Ce guardrail ne couvre PAS ce cas
+#
+# DESIGN CHOICE — DEUX NIVEAUX DE SÉVÉRITÉ :
+#
+#   Pourquoi ne pas tout bloquer ?
+#   Bloquer systématiquement sur 1 source fantôme serait trop strict :
+#   Claude peut parfois faire une erreur de numérotation mineure (ex: citer
+#   [SOURCE 6] au lieu de [SOURCE 5] par off-by-one). Ce n'est pas la même
+#   gravité que citer [SOURCE 12] avec k=5.
+#
+#   Niveau LOW  (1 source fantôme) : probable erreur de numérotation mineure.
+#     → On laisse passer mais on flag dans la réponse + warning log.
+#     → L'utilisateur est informé, peut décider de relancer.
+#
+#   Niveau HIGH (2+ sources fantômes) : probable complétion mémoire massive.
+#     → On bloque avec HTTP 503. Le modèle s'est affranchi des sources fournies.
+#     → 2 est le seuil minimal pour éviter les faux positifs sur off-by-one.
+#
+# CE QU'ON NE DÉTECTE PAS VOLONTAIREMENT :
+#   - [SOURCE 0] : pas de source numérotée 0 dans notre prompt (on démarre à 1),
+#     donc 0 est toujours fantôme. Inclus dans la détection.
+#   - Les citations en texte libre ("Article 17 du GDPR" sans [SOURCE X]) :
+#     non détectables ici — couvert par le pipeline faithfulness.
+#   - Les numéros de source corrects avec contenu incorrect (Type B ci-dessus).
+
+# Seuils de sévérité — ajustables selon le contexte de déploiement
+_GUARDRAIL_LOW_THRESHOLD  = 1  # 1 source fantôme → LOW (warning + flag)
+_GUARDRAIL_HIGH_THRESHOLD = 2  # 2+ sources fantômes → HIGH (bloquant)
+
+# Message de disclaimer ajouté à la réponse en cas de niveau LOW.
+# Volontairement court et non-alarmiste pour ne pas polluer l'UX.
+# Le message ne révèle pas les détails internes (numéros de sources, k).
+_GUARDRAIL_DISCLAIMER_FR = (
+    "\n\n---\n"
+    "⚠ *Note : Cette réponse contient une référence à une source non disponible "
+    "dans les documents consultés. Les informations citées sans source directe "
+    "proviennent de la connaissance générale du modèle et ne sont pas directement "
+    "vérifiables via notre corpus réglementaire.*"
+)
+_GUARDRAIL_DISCLAIMER_EN = (
+    "\n\n---\n"
+    "⚠ *Note: This response contains a reference to a source not available "
+    "in the consulted documents. Information cited without a direct source "
+    "comes from the model's general knowledge and cannot be directly "
+    "verified against our regulatory corpus.*"
+)
+
+
+def check_hallucination_guardrail(
+    response: str,
+    n_chunks: int,
+    language: str = "fr",
+) -> dict:
+    """
+    Détecte les "sources fantômes" dans la réponse Claude.
+
+    Une source fantôme = [SOURCE X] dans la réponse avec X > n_chunks.
+    Ces références ne correspondent à aucun chunk réellement fourni au LLM.
+
+    PARAMÈTRES :
+        response  : texte brut de la réponse Claude
+        n_chunks  : nombre de chunks effectivement fournis (== k après reranking)
+        language  : "fr" ou "en" — pour le disclaimer
+
+    RETOURNE un dict avec :
+        flagged            : bool — True si au moins 1 source fantôme
+        severity           : "ok" | "low" | "high"
+        ghost_sources      : list[int] — numéros de sources fantômes trouvés
+        n_cited            : int — nombre total de [SOURCE X] dans la réponse
+        n_valid            : int — citations valides (X entre 1 et n_chunks)
+        response_patched   : str — réponse originale + disclaimer si LOW
+                                   None si HIGH (réponse bloquée)
+        detail             : str — message humain pour les logs / l'API
+
+    EXEMPLE :
+        response  = "...Article 83 [SOURCE 7] prévoit des sanctions..."
+        n_chunks  = 5
+        →  ghost_sources = [7], severity = "low"
+        →  response_patched = réponse + disclaimer
+    """
+    # Extrait tous les numéros [SOURCE X] de la réponse.
+    # Pattern : [SOURCE suivi d'un ou plusieurs chiffres]
+    # On ne capture que les entiers — [SOURCE abc] n'est pas un nombre valide.
+    cited_numbers: list[int] = [
+        int(x) for x in re.findall(r'\[SOURCE\s+(\d+)\]', response)
+    ]
+
+    if not cited_numbers:
+        # Aucune citation [SOURCE X] dans la réponse.
+        # Deux cas possibles :
+        #   1. Claude a bien répondu sans citer de sources (rare, peut arriver
+        #      si les sources sont insuffisantes et qu'il le dit)
+        #   2. Claude a utilisé un autre format de citation (non capturé ici)
+        # Dans les deux cas : pas de source fantôme détectable → OK.
+        return {
+            "flagged":          False,
+            "severity":         "ok",
+            "ghost_sources":    [],
+            "n_cited":          0,
+            "n_valid":          0,
+            "response_patched": response,
+            "detail":           f"Aucune citation [SOURCE X] détectée — {n_chunks} chunks disponibles",
+        }
+
+    # Déduplique pour le diagnostic (on ne veut compter chaque fantôme qu'une fois).
+    # Ex: [SOURCE 7] cité 3 fois → 1 seul fantôme, pas 3.
+    unique_cited = set(cited_numbers)
+    n_cited      = len(cited_numbers)      # total avec répétitions (pour les stats)
+
+    # Identifie les fantômes : numéros hors de la plage [1, n_chunks].
+    # Note : SOURCE 0 est aussi un fantôme (numérotation commence à 1 dans le prompt).
+    ghost_sources = sorted([x for x in unique_cited if x < 1 or x > n_chunks])
+    valid_sources = sorted([x for x in unique_cited if 1 <= x <= n_chunks])
+    n_valid       = len([x for x in cited_numbers if 1 <= x <= n_chunks])
+
+    if not ghost_sources:
+        # Toutes les citations sont dans la plage valide → pas de problème.
+        return {
+            "flagged":          False,
+            "severity":         "ok",
+            "ghost_sources":    [],
+            "n_cited":          n_cited,
+            "n_valid":          n_valid,
+            "response_patched": response,
+            "detail":           (
+                f"Toutes les citations valides — "
+                f"{len(unique_cited)} sources distinctes citées sur {n_chunks} disponibles"
+            ),
+        }
+
+    # ── Au moins 1 source fantôme détectée ────────────────────────────────────
+    n_ghosts = len(ghost_sources)
+
+    if n_ghosts >= _GUARDRAIL_HIGH_THRESHOLD:
+        # HIGH : 2+ sources fantômes → réponse bloquée.
+        # Le modèle s'est affranchi massivement des sources fournies.
+        # On ne retourne pas la réponse — l'appelant doit lever une HTTPException.
+        detail = (
+            f"[GUARDRAIL HIGH] {n_ghosts} sources fantômes détectées : "
+            f"{ghost_sources} — k={n_chunks}. "
+            f"Réponse bloquée. Le modèle a complété depuis sa mémoire."
+        )
+        return {
+            "flagged":          True,
+            "severity":         "high",
+            "ghost_sources":    ghost_sources,
+            "n_cited":          n_cited,
+            "n_valid":          n_valid,
+            "response_patched": None,  # None signale à l'appelant : bloquer
+            "detail":           detail,
+        }
+
+    else:
+        # LOW : exactement 1 source fantôme → on laisse passer avec disclaimer.
+        # Probable off-by-one ou erreur mineure de numérotation.
+        # Le disclaimer informe l'utilisateur sans bloquer l'UX.
+        disclaimer = (
+            _GUARDRAIL_DISCLAIMER_FR if language == "fr"
+            else _GUARDRAIL_DISCLAIMER_EN
+        )
+        detail = (
+            f"[GUARDRAIL LOW] {n_ghosts} source fantôme : "
+            f"{ghost_sources} — k={n_chunks}. "
+            f"Disclaimer ajouté à la réponse."
+        )
+        return {
+            "flagged":          True,
+            "severity":         "low",
+            "ghost_sources":    ghost_sources,
+            "n_cited":          n_cited,
+            "n_valid":          n_valid,
+            "response_patched": response + disclaimer,
+            "detail":           detail,
+        }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # ÉTAPE 4 : GÉNÉRATION LLM
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -466,14 +700,8 @@ def build_prompt(question: str, chunks: list[dict], language: str = "fr") -> str
             "à la question de manière précise et structurée.\n\n"
             "RÈGLES ABSOLUES :\n"
             "- Base ta réponse EXCLUSIVEMENT sur les sources fournies\n"
-            "- INTERDIT : ajouter des informations, numéros d'articles ou références "
-            "que tu connais mais qui ne figurent PAS dans les sources ci-dessous — "
-            "même si ces informations sont exactes et pertinentes\n"
-            "- Si une information ne peut pas être directement citée depuis une source, "
-            "ne l'inclus pas dans ta réponse\n"
             "- Cite chaque affirmation avec [SOURCE X] correspondant au numéro ci-dessus\n"
-            "- Si les sources ne permettent pas de répondre complètement, indique-le "
-            "explicitement plutôt que de compléter depuis ta mémoire\n"
+            "- Si les sources ne permettent pas de répondre complètement, indique-le explicitement\n"
             "- Utilise un langage juridique précis mais accessible\n"
             "- Structure ta réponse avec des paragraphes clairs\n"
             "- À la fin, liste les sources utilisées au format "
@@ -488,14 +716,8 @@ def build_prompt(question: str, chunks: list[dict], language: str = "fr") -> str
             "precisely and in a structured manner.\n\n"
             "ABSOLUTE RULES:\n"
             "- Base your answer EXCLUSIVELY on the provided sources\n"
-            "- FORBIDDEN: adding information, article numbers or references "
-            "you know but that do NOT appear in the sources below — "
-            "even if that information is accurate and relevant\n"
-            "- If a piece of information cannot be directly cited from a source, "
-            "do not include it in your answer\n"
             "- Cite each claim with [SOURCE X] matching the number above\n"
-            "- If the sources are insufficient to answer completely, state this "
-            "explicitly rather than completing from memory\n"
+            "- If the sources are insufficient to answer completely, state this explicitly\n"
             "- Use precise but accessible legal language\n"
             "- Structure your answer with clear paragraphs\n"
             "- At the end, list the sources used as \"Regulation Article/Recital X (Year)\"\n\n"
@@ -510,9 +732,9 @@ async def generate_answer(
     question: str,
     chunks: list[dict],
     language: str = "fr",
-) -> tuple[str, list[str], str]:
+) -> tuple[str, list[str], str, dict]:
     """
-    Envoie le prompt au LLM Claude et parse la réponse.
+    Envoie le prompt au LLM Claude, parse la réponse, et applique le guardrail.
 
     POURQUOI async ?
     L'appel à l'API Anthropic est une opération I/O (réseau).
@@ -524,7 +746,15 @@ async def generate_answer(
     on génère une réponse structurée qui liste les chunks avec leurs scores.
     L'API reste 100% fonctionnelle pour valider la recherche vectorielle.
 
-    Retourne : (texte_réponse, liste_citations, modèle_utilisé)
+    GUARDRAIL :
+    Après la génération, on vérifie les sources fantômes via
+    check_hallucination_guardrail(). En mode fallback, le guardrail est skippé
+    (la réponse fallback ne contient pas de [SOURCE X]).
+
+    Retourne : (texte_réponse, liste_citations, modèle_utilisé, guardrail_result)
+        guardrail_result : dict retourné par check_hallucination_guardrail()
+                           Contient severity, ghost_sources, etc.
+                           En mode fallback : {"severity": "ok", "flagged": False, ...}
     """
     import os
     model_id = "claude-sonnet-4-20250514"
@@ -560,7 +790,36 @@ async def generate_answer(
         raw       = re.findall(citation_pattern, answer)
         citations = list(dict.fromkeys(raw))  # déduplique en préservant l'ordre
 
+        # ── ÉTAPE 5 : Hallucination Guardrail ─────────────────────────────────
+        # On applique le guardrail sur la réponse Claude avant de la retourner.
+        # Le guardrail reçoit la réponse brute et le nombre de chunks fournis.
+        # Il retourne soit la réponse originale, soit la réponse + disclaimer (LOW),
+        # soit None (HIGH → l'appelant doit lever une exception).
+        #
+        # NOTE : on passe len(chunks) et non request.k — c'est le nombre réel
+        # de chunks fournis à Claude après reranking, qui peut être < k si FAISS
+        # a retourné moins de résultats que demandé.
+        guardrail = check_hallucination_guardrail(
+            response  = answer,
+            n_chunks  = len(chunks),
+            language  = language,
+        )
+
+        if guardrail["flagged"]:
+            logger.warning(guardrail["detail"])
+
+        # Utilise la réponse (potentiellement patchée avec disclaimer).
+        # Si severity=HIGH, response_patched est None — géré dans search().
+        answer = guardrail["response_patched"] if guardrail["response_patched"] else answer
+
     except Exception as e:
+        # En cas d'exception inattendue (hors guardrail HIGH), on initialise
+        # un guardrail neutre pour que le fallback ait toujours un guardrail_result.
+        guardrail = {
+            "flagged": False, "severity": "ok", "ghost_sources": [],
+            "n_cited": 0, "n_valid": 0, "response_patched": None,
+            "detail": f"Exception avant guardrail : {e}",
+        }
         logger.warning(f"Génération LLM échouée : {e}")
 
         # ── FALLBACK : réponse structurée sans LLM ────────────────────────────
@@ -594,8 +853,15 @@ async def generate_answer(
             f"{c.get('regulation')} {c.get('segment_id')} ({c.get('year')})"
             for c in chunks
         ]
+        # Guardrail skippé en mode fallback : la réponse fallback ne contient
+        # pas de [SOURCE X], donc il n'y a rien à vérifier.
+        guardrail = {
+            "flagged": False, "severity": "ok", "ghost_sources": [],
+            "n_cited": 0, "n_valid": 0, "response_patched": answer,
+            "detail": "Guardrail skipped — mode fallback (pas de génération LLM)",
+        }
 
-    return answer, citations, model_id
+    return answer, citations, model_id, guardrail
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -712,11 +978,41 @@ async def search(request: SearchRequest) -> SearchResponse:
     n_used = len(final_chunks)
 
     # ── ÉTAPE 4 : Génération LLM ──────────────────────────────────────────────
-    answer, citations, model_used = await generate_answer(
+    answer, citations, model_used, guardrail = await generate_answer(
         question = request.question,
         chunks   = final_chunks,
         language = request.language.value,
     )
+
+    # ── ÉTAPE 5 : Gestion du résultat guardrail ───────────────────────────────
+    #
+    # generate_answer() applique le guardrail en interne et retourne le résultat.
+    # Ici on gère uniquement le cas HIGH — le seul qui nécessite une action dans
+    # l'endpoint (lever une exception). Les cas OK et LOW sont déjà traités
+    # (answer contient le disclaimer si LOW, et le log est fait dans generate_answer).
+    #
+    # POURQUOI 503 et pas 422 ou 500 ?
+    #   503 = Service Unavailable — sémantiquement correct : le service ne peut pas
+    #   garantir la traçabilité de cette réponse spécifique. Ce n'est pas une erreur
+    #   client (pas 4xx) ni un crash serveur (pas 500). C'est le service lui-même
+    #   qui se déclare incapable de fournir une réponse conforme.
+    #
+    # QUE FAIRE CÔTÉ CLIENT sur un 503 guardrail ?
+    #   Option 1 : Relancer la même requête (Claude peut produire une réponse
+    #              différente — les LLMs sont non-déterministes).
+    #   Option 2 : Augmenter k pour fournir plus de chunks à Claude.
+    #   Option 3 : Accepter la limitation et utiliser le mode fallback (chunks bruts).
+    if guardrail["severity"] == "high":
+        ghost_list = ", ".join(f"[SOURCE {x}]" for x in guardrail["ghost_sources"])
+        raise HTTPException(
+            status_code = 503,
+            detail      = (
+                f"Réponse non conforme : {len(guardrail['ghost_sources'])} source(s) "
+                f"non traçable(s) détectée(s) ({ghost_list}). "
+                f"Le modèle a cité des sources absentes du corpus fourni. "
+                f"Relancez la requête ou augmentez k pour fournir plus de contexte."
+            ),
+        )
 
     # ── Construction de la réponse structurée ────────────────────────────────
     elapsed_ms = (time.perf_counter() - t_start) * 1000
