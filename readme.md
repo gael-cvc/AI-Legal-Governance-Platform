@@ -1,305 +1,301 @@
 # AI Legal Governance Intelligence Platform
 
-> **[Français ci-dessous](#plateforme-dintelligence-juridique-ai)**
+> RAG system for European regulatory law — GDPR · EU AI Act · DGA · EDPB Guidelines · CNIL
 
-A production-ready RAG (Retrieval-Augmented Generation) system applied to European law. Answers precise legal questions by citing exact sources from a corpus of EU regulatory texts (GDPR, AI Act, DGA, CNIL, EDPB).
+A production-grade Retrieval-Augmented Generation (RAG) API that answers legal questions in natural language with **full source traceability**. Every claim in every response is anchored to a specific article or recital from the official regulatory corpus.
 
-## Business Problem
+Built for lawyers, DPOs, and compliance officers who need verifiable answers — not hallucinated summaries.
 
-Organizations deploying AI systems in Europe must comply with:
-- GDPR requirements (Regulation EU 2016/679)
-- EU AI Act high-risk obligations (Regulation EU 2024/1689)
-- Data Governance Act (Regulation EU 2022/868)
-- National authority guidelines (CNIL, EDPB)
-- Automated decision-making restrictions
+---
 
-Legal documents are long (100–300+ pages), complex, frequently updated, and high-stakes in interpretation. Compliance teams need fast access to relevant articles, reliable citation, and auditability of AI responses.
+## Why RAG and not a chatbot?
 
-This platform addresses that need by combining semantic search, cross-encoder reranking, and strict citation enforcement — making it suitable for high-risk regulatory environments.
+A general-purpose LLM knows the GDPR — but you can't audit its answers. It completes from memory, mixes versions, and cites articles that may have been amended. RAG forces the model to answer **exclusively from the documents you provide**, with mandatory citations. Every response is traceable, auditable, and reproducible.
 
-## Stack
-
-- **LLM** — Claude Sonnet 4 (Anthropic)
-- **Embeddings** — all-MiniLM-L6-v2 (sentence-transformers)
-- **Vector store** — FAISS IndexFlatIP
-- **Reranker** — cross-encoder/ms-marco-MiniLM-L-6-v2
-- **API** — FastAPI
-- **Runtime** — Python 3.12, Apple Silicon M4 (MPS)
-
-## System Architecture
-
-**Data Layer**
-Official regulatory PDFs → metadata extraction → chunking (raw → bronze → silver)
-
-**Retrieval Layer**
-Query expansion → sentence-transformer embeddings → FAISS vector search → cross-encoder reranking
-
-**Generation Layer**
-Strict prompt template — citation required, no speculation, refusal when context insufficient
-
-## Installation
-
-```bash
-git clone https://github.com/gael-cvc/AI-Legal-Governance-Platform.git
-cd AI-Legal-Governance-Platform
-
-python -m venv venv
-source venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-Create a `.env` file at the root:
-
-```
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-## Build the pipeline
-
-```bash
-# 1. Ingestion — PDF → chunks (data/silver/)
-python -m ingestion.pipeline
-
-# 2. Indexing — chunks → FAISS (data/vector_store/)
-python -m rag.build_index
-```
-
-## Run the API
-
-```bash
-TRANSFORMERS_OFFLINE=1 uvicorn api.main:app --reload --port 8000
-```
-
-Swagger UI available at `http://localhost:8000/docs`
-
-## Usage
-
-**Health check**
-```bash
-curl http://localhost:8000/health
-```
-
-**Search without reranking**
-```bash
-curl -X POST http://localhost:8000/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "What are the obligations of a data controller under GDPR?", "k": 3, "use_reranking": false}'
-```
-
-**Search with reranking (recommended)**
-```bash
-curl -X POST http://localhost:8000/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "What are the obligations of a data controller under GDPR?", "k": 3, "use_reranking": true}'
-```
+---
 
 ## Features
 
 | Feature | Status |
-|---------|--------|
-| PDF ingestion pipeline (raw → bronze → silver) | ✅ Done |
-| Sentence-transformer embeddings (MPS) | ✅ Done |
-| FAISS vector search with deduplication | ✅ Done |
-| Query expansion | ✅ Done |
-| Cross-encoder reranking | ✅ Done |
-| FastAPI with singleton pattern | ✅ Done |
-| Strict citation enforcement | ✅ Done |
-| Evaluation metrics (recall@k, faithfulness) | 🔄 In progress |
-| Metadata filtering by regulation / article | 🔄 In progress |
-| Prompt injection defense | 🔄 In progress |
-| Docker + docker-compose | 🔄 In progress |
-
-## Project structure
-
-```
-├── ingestion/        # Pipeline PDF → bronze → silver
-│   ├── pdf_parser.py
-│   ├── article_extractor.py
-│   ├── chunker.py
-│   └── pipeline.py
-├── rag/              # Embedding, FAISS, reranker
-│   ├── embedder.py
-│   ├── vector_store.py
-│   ├── reranker.py
-│   └── build_index.py
-├── api/              # FastAPI
-│   ├── main.py
-│   ├── search.py
-│   ├── models.py
-│   └── health.py
-├── data/
-│   ├── raw/          # Source PDFs (not versioned)
-│   ├── bronze/       # Segments + metadata
-│   ├── silver/       # Chunks JSONL
-│   └── vector_store/ # FAISS index
-└── docs/             # Full technical documentation
-```
-
-## Corpus
-
-| Document | Type |
-|----------|------|
-| GDPR (EN + FR) | Regulation EU 2016/679 |
-| RGPD Recitals | Recitals 1-173 |
-| AI Act + Annexes | Regulation EU 2024/1689 |
-| Data Governance Act | Regulation EU 2022/868 |
-| EDPB Guidelines | Automated decision-making |
-| CNIL Recommendations | AI compliance |
-
-## Documentation
-
-Full technical documentation available in [`docs/`](docs/project_doc.html) — architecture, technical decisions, results and logs.
+|---|---|
+| RAG pipeline (query expansion → FAISS → reranker → Claude) | ✅ |
+| Two-stage retrieval (vector search + cross-encoder reranking) | ✅ |
+| Metadata filtering (regulation, article, segment type, language) | ✅ |
+| Prompt injection defense (18 regex + structural heuristics) | ✅ |
+| Hallucination guardrail (ghost source detection, LOW/HIGH severity) | ✅ |
+| Faithfulness evaluation — LLM-as-judge (88.5% @ k=5) | ✅ |
+| Recall@5 evaluation pipeline (100% internal consistency) | ✅ |
+| Docker containerization (MPS local / CPU cloud) | ✅ |
+| Bilingual responses (FR / EN) | ✅ |
+| Auth JWT + rate limiting | 🔄 In progress |
+| Frontend (Next.js / Streamlit) | 📋 Roadmap |
+| Audit log JSONL | 📋 Roadmap |
 
 ---
 
-# Plateforme d'Intelligence Juridique AI
+## Corpus
 
-Système RAG (Retrieval-Augmented Generation) appliqué au droit européen. Répond à des questions juridiques précises en citant les sources exactes depuis un corpus de textes réglementaires EU (RGPD, AI Act, DGA, CNIL, EDPB).
+| Document | Regulation | Chunks |
+|---|---|---|
+| GDPR (Regulation 2016/679) | GDPR | ~600 |
+| EU AI Act (Regulation 2024/1689) | EU_AI_ACT | ~500 |
+| Data Governance Act | DATA_GOVERNANCE | ~200 |
+| EDPB Guidelines (automated decisions, consent, transfers) | EDPB | ~400 |
+| CNIL AI recommendations | CNIL | ~150 |
+| + supplementary documents | — | ~166 |
 
-## Problème métier
+**Total : 2,016 chunks · 8 PDFs · 384-dimensional vectors**
 
-Les organisations déployant des systèmes d'IA en Europe doivent se conformer à :
-- Les exigences du RGPD (Règlement EU 2016/679)
-- Les obligations de l'AI Act pour les systèmes à haut risque (Règlement EU 2024/1689)
-- Le Data Governance Act (Règlement EU 2022/868)
-- Les recommandations des autorités nationales (CNIL, EDPB)
-- Les restrictions sur la prise de décision automatisée
+---
 
-Les textes réglementaires sont longs (100–300+ pages), complexes, fréquemment mis à jour, et à forts enjeux d'interprétation. Les équipes conformité ont besoin d'un accès rapide aux articles pertinents, d'une citation fiable, et d'une traçabilité des réponses IA.
+## Architecture
 
-Cette plateforme répond à ce besoin en combinant recherche sémantique, reranking cross-encoder, et enforcement strict des citations — adaptée aux environnements réglementaires à haut risque.
+```
+Question
+    │
+    ▼
+[0] Prompt Injection Defense     — 18 regex + structural heuristics → HTTP 400
+    │
+    ▼
+[1] Query Expansion              — 3 reformulations via LLM → reduces vocabulary mismatch
+    │
+    ▼
+[2] FAISS Vector Search          — IndexFlatIP, cosine similarity, k*2 candidates
+    │
+    ▼
+[3] Cross-Encoder Reranking      — ms-marco-MiniLM-L-6-v2, reads (question, chunk) together
+    │
+    ▼
+[4] Claude Generation            — build_prompt() v1.1, FORBIDDEN memory completion rule
+    │
+    ▼
+[5] Hallucination Guardrail      — ghost source detection, LOW disclaimer / HIGH HTTP 503
+    │
+    ▼
+Structured JSON response (answer + citations + sources + metadata)
+```
+
+**Singleton pattern** — VectorStore, LegalEmbedder, and LegalReranker are loaded once at startup via FastAPI lifespan. Zero reloading overhead per request.
+
+---
+
+## Evaluation
+
+### Recall@5 — 100% (internal consistency)
+
+19/19 questions return at least one expected segment in the top 5 results with reranking enabled.
+
+> ⚠️ **Methodological note**: the dataset was calibrated on the existing index — this measures internal consistency, not external validity. An independent benchmark (lawyer annotation, multi-value `expected_ids`) is planned for a future release.
+
+### Faithfulness — 88.5% (LLM-as-judge, k=5, prompt v1.1)
+
+Measures the share of claims in Claude's response that are directly traceable to the provided source chunks.
+
+**3 runs documented:**
+
+| Run | Config | Score | Delta |
+|---|---|---|---|
+| Run 1 | Prompt v1.0 · k=5 | 87.4% | baseline |
+| Run 2 | Prompt v1.1 (FORBIDDEN rule) · k=5 | **88.5%** | +1.1% |
+| Run 3 | Prompt v1.1 · k=7 | 87.4% | −1.1% |
+
+**Structural ceiling ~88%** identified: the unsupported claims correspond to legally correct information that Claude has deeply internalized from training (GDPR is heavily represented). This is not hallucination — it's untraceable memory completion. The ceiling is a model-level constraint, not a retrieval problem. k=7 confirmed this: adding more chunks did not help.
+
+### Hallucination Guardrail — Active
+
+Detects **ghost sources**: `[SOURCE X]` references where X > number of chunks provided.
+
+- **LOW** (1 ghost): response returned with disclaimer appended + warning log
+- **HIGH** (2+ ghosts): HTTP 503, response blocked
+
+This is a **Level 1 guardrail** (structural check, 0ms, 0 cost). Level 2 (semantic faithfulness per request via LLM-as-judge) is on the roadmap at ~$0.02/req.
+
+---
 
 ## Stack
 
-- **LLM** — Claude Sonnet 4 (Anthropic)
-- **Embeddings** — all-MiniLM-L6-v2 (sentence-transformers)
-- **Vector store** — FAISS IndexFlatIP
-- **Reranker** — cross-encoder/ms-marco-MiniLM-L-6-v2
-- **API** — FastAPI
-- **Runtime** — Python 3.12, Apple Silicon M4 (MPS)
+```
+Python 3.12
+FastAPI          — async REST API, Pydantic validation
+FAISS            — IndexFlatIP, exact cosine similarity
+sentence-transformers — all-MiniLM-L6-v2 (embedder) + ms-marco-MiniLM-L-6-v2 (reranker)
+Anthropic API    — claude-sonnet-4-20250514
+PyMuPDF          — PDF ingestion
+Docker + Compose — containerization, DEVICE env var (mps/cpu)
+```
 
-## Architecture système
+---
 
-**Couche données**
-PDFs réglementaires officiels → extraction metadata → chunking (raw → bronze → silver)
+## Quick Start
 
-**Couche retrieval**
-Query expansion → embeddings → recherche FAISS → reranking cross-encoder
-
-**Couche génération**
-Prompt strict — citation obligatoire, pas de spéculation, refus si contexte insuffisant
-
-## Installation
+### Local (Mac M4 / MPS)
 
 ```bash
-git clone https://github.com/gael-cvc/AI-Legal-Governance-Platform.git
+git clone https://github.com/gael-cvc/AI-Legal-Governance-Platform
 cd AI-Legal-Governance-Platform
-
-python -m venv venv
-source venv/bin/activate
-
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-```
 
-Créer un fichier `.env` à la racine :
+cp .env.example .env
+# Add your ANTHROPIC_API_KEY to .env
 
-```
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-## Construire le pipeline
-
-```bash
-# 1. Ingestion — PDF → chunks (data/silver/)
-python -m ingestion.pipeline
-
-# 2. Indexation — chunks → FAISS (data/vector_store/)
-python -m rag.build_index
-```
-
-## Lancer l'API
-
-```bash
 TRANSFORMERS_OFFLINE=1 uvicorn api.main:app --reload --port 8000
 ```
 
-Swagger UI disponible sur `http://localhost:8000/docs`
+### Docker (CPU)
 
-## Utilisation
+```bash
+cp .env.example .env
+# Add your ANTHROPIC_API_KEY to .env
 
-**Health check**
+docker compose up --build
+```
+
+### Build the index (required on first run)
+
+```bash
+python -m rag.build_index
+# Expected: 2016 vectors · 384D · IndexFlatIP
+```
+
+---
+
+## API
+
+### POST /search
+
+```bash
+curl -X POST http://localhost:8000/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What are the obligations of a data controller under GDPR?",
+    "k": 5,
+    "use_reranking": true,
+    "language": "fr"
+  }'
+```
+
+**Optional filters:**
+```json
+{
+  "regulation": "GDPR",
+  "segment_type": "article",
+  "article_number": "Article 35",
+  "language_filter": "en",
+  "min_score": 0.35
+}
+```
+
+### GET /health
+
 ```bash
 curl http://localhost:8000/health
 ```
 
-**Recherche sans reranking**
+```json
+{
+  "status": "ok",
+  "vector_store": { "loaded": true, "n_vectors": 2016, "dimension": 384 },
+  "embedder":     { "loaded": true, "model": "all-MiniLM-L6-v2", "device": "mps" },
+  "reranker":     { "loaded": true, "model": "ms-marco-MiniLM-L-6-v2", "device": "mps" }
+}
+```
+
+### GET /search/suggestions
+
+Returns example questions by regulation for frontend onboarding.
+
+---
+
+## Evaluation CLI
+
 ```bash
-curl -X POST http://localhost:8000/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Quelles sont les obligations du responsable de traitement sous le RGPD ?", "k": 3, "use_reranking": false}'
+# Recall@5 only (fast, free)
+python -m evaluation.evaluator --no-faithfulness
+
+# Recall@3 + faithfulness on 10 cases (~$0.20)
+python -m evaluation.evaluator --k 3
+
+# GDPR only
+python -m evaluation.evaluator --regulation GDPR --no-faithfulness
+
+# Measure reranking impact
+python -m evaluation.evaluator --no-reranking --no-faithfulness
+
+# Custom output path
+python -m evaluation.evaluator --output evaluation/results/run_$(date +%Y-%m-%d).json
 ```
 
-**Recherche avec reranking (recommandé)**
-```bash
-curl -X POST http://localhost:8000/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Quelles sont les obligations du responsable de traitement sous le RGPD ?", "k": 3, "use_reranking": true}'
-```
+---
 
-## Fonctionnalités
-
-| Fonctionnalité | Statut |
-|----------------|--------|
-| Pipeline d'ingestion PDF (raw → bronze → silver) | ✅ Fait |
-| Embeddings sentence-transformer (MPS) | ✅ Fait |
-| Recherche FAISS avec déduplication | ✅ Fait |
-| Query expansion | ✅ Fait |
-| Reranking cross-encoder | ✅ Fait |
-| FastAPI avec pattern singleton | ✅ Fait |
-| Enforcement strict des citations | ✅ Fait |
-| Métriques d'évaluation (recall@k, faithfulness) | 🔄 En cours |
-| Filtrage par métadonnées (règlement, article) | 🔄 En cours |
-| Défense contre les injections de prompt | 🔄 En cours |
-| Docker + docker-compose | 🔄 En cours |
-
-## Structure du projet
+## Project Structure
 
 ```
-├── ingestion/        # Pipeline PDF → bronze → silver
-│   ├── pdf_parser.py
-│   ├── article_extractor.py
-│   ├── chunker.py
-│   └── pipeline.py
-├── rag/              # Embedding, FAISS, reranker
-│   ├── embedder.py
-│   ├── vector_store.py
-│   ├── reranker.py
-│   └── build_index.py
-├── api/              # FastAPI
-│   ├── main.py
-│   ├── search.py
-│   ├── models.py
-│   └── health.py
+.
+├── api/
+│   ├── main.py          # FastAPI app, lifespan, singletons
+│   ├── search.py        # RAG pipeline, guardrails, prompt engineering
+│   └── models.py        # Pydantic schemas
+├── rag/
+│   ├── build_index.py   # FAISS index construction
+│   ├── vector_store.py  # FAISS search + metadata filters
+│   └── embedder.py      # LegalEmbedder singleton
+├── ingestion/           # raw → bronze → silver pipeline
+├── evaluation/
+│   ├── evaluator.py     # recall@k + faithfulness LLM-as-judge
+│   └── eval_dataset.py  # 19 EvalCase definitions
 ├── data/
-│   ├── raw/          # PDFs sources (non versionnés)
-│   ├── bronze/       # Segments + metadata
-│   ├── silver/       # Chunks JSONL
-│   └── vector_store/ # Index FAISS
-└── docs/             # Documentation technique complète
+│   ├── raw/             # source PDFs (not versioned)
+│   ├── bronze/          # parsed segments
+│   ├── silver/          # final chunks
+│   └── vector_store/    # FAISS index (not versioned)
+├── Dockerfile
+├── docker-compose.yml
+└── .env.example
 ```
 
-## Corpus
+---
 
-| Document | Type |
-|----------|------|
-| GDPR (EN + FR) | Règlement EU 2016/679 |
-| RGPD Recitals | Considérants 1-173 |
-| AI Act + Annexes | Règlement EU 2024/1689 |
-| Data Governance Act | Règlement EU 2022/868 |
-| EDPB Guidelines | Décision automatisée |
-| CNIL Recommendations | Conformité IA |
+## Environment Variables
 
-## Documentation
+```bash
+ANTHROPIC_API_KEY=sk-ant-...   # Required
+DEVICE=mps                     # mps (Mac M4) or cpu (Docker/cloud)
+TRANSFORMERS_OFFLINE=1         # Use cached models (recommended)
+```
 
-Documentation technique complète disponible dans [`docs/`](docs/project_doc.html) — architecture, décisions techniques, résultats et logs.
+---
+
+## Metrics Summary
+
+| Metric | Value | Notes |
+|---|---|---|
+| Chunks | 2,016 | silver layer, ready to query |
+| Vector dimensions | 384 | all-MiniLM-L6-v2 |
+| FAISS index size | ~3MB | fits entirely in RAM |
+| FAISS latency | < 5ms | exact search, 2016 vectors |
+| Reranking latency | ~1-2s | cross-encoder, 6 pairs |
+| Total /search latency | ~14s | query expansion + Claude |
+| Recall@5 | 100% ⚠ | internal dataset |
+| Faithfulness | 88.5% | k=5, prompt v1.1, LLM-as-judge |
+| Injection patterns | 18 regex | + 3 structural heuristics |
+| Guardrail | Active | LOW/HIGH severity |
+
+---
+
+## Roadmap
+
+- [ ] Auth JWT + API key rotation + rate limiting (slowapi)
+- [ ] Audit log JSONL (request_id, sources, latency, user_id)
+- [ ] Legal disclaimer automatic injection
+- [ ] Frontend (Next.js or Streamlit)
+- [ ] Corpus update pipeline (incremental FAISS.add())
+- [ ] Unit tests + CI/CD (GitHub Actions)
+- [ ] Cloud deployment (Cloud Run)
+- [ ] Independent benchmark (lawyer-annotated dataset)
+
+---
+
+## License
+
+Private repository — all rights reserved.

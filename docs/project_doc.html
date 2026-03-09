@@ -175,6 +175,7 @@ pre { padding:20px 24px; font-family:var(--mono); font-size:12px; line-height:1.
     <a class="nav-item" href="#metadata-filters">Étape 5 — Metadata Filtering</a>
     <a class="nav-item" href="#evaluation">Étape 6 — Évaluation RAG</a>
     <a class="nav-item" href="#injection">Étape 7 — Injection Defense</a>
+    <a class="nav-item" href="#guardrail">Étape 7b — Hallucination Guardrail</a>
     <a class="nav-item" href="#docker">Étape 8 — Docker & Déploiement</a>
   </div>
   <div class="nav-section">
@@ -1341,8 +1342,8 @@ score = len(supported) / len(all_claims)</pre>
     <div class="info-card">
       <h4>Court terme — Quick wins (0€)</h4>
       <ul>
-        <li>Hallucination guardrail niveau 1 : vérifier que les [SOURCE X] citées existent (30 min)</li>
-        <li>Prompt versioning dans <code>prompts/CHANGELOG.md</code> — tracker chaque modification + score</li>
+        <li><strong style="color:var(--green)">✓ Hallucination guardrail niveau 1 : implémenté</strong> — LOW/HIGH sévérité, HTTP 503 bloquant</li>
+        <li><strong style="color:var(--green)">✓ Prompt versioning</strong> — chaque modification build_prompt() commitée avec score (v1.0 : 87.4% → v1.1 : 88.5%)</li>
         <li>Re-run faithfulness à chaque modification de <code>build_prompt()</code></li>
       </ul>
     </div>
@@ -1477,6 +1478,195 @@ is_injection, reason = detect_prompt_injection(request.question)
     </div>
   </div>
 </section>
+
+
+
+<!-- SECTION — HALLUCINATION GUARDRAIL -->
+<section class="section" id="guardrail">
+  <div class="section-header">
+    <div class="section-number">07b</div>
+    <div class="section-title-block">
+      <h2>Étape 7b — Hallucination Guardrail</h2>
+      <p>Sources fantômes · Deux niveaux de sévérité · LOW warning · HIGH HTTP 503</p>
+    </div>
+  </div>
+
+  <!-- POURQUOI -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:0 0 16px;">Pourquoi un guardrail ? — La limite de la règle INTERDIT</h3>
+
+  <p style="color:var(--text-mid);margin-bottom:20px;">Le patch du prompt v1.1 (règle INTERDIT) a amélioré la faithfulness de 87.4% à 88.5%. Mais il ne résout pas tout : Claude peut respecter la règle sur le <em>contenu</em> des affirmations et pourtant citer un numéro de source qui n'existe pas. C'est le problème des <strong style="color:#fff">sources fantômes</strong>.</p>
+
+  <div class="two-col">
+    <div class="callout danger">
+      <div class="callout-title">Le problème — Source fantôme</div>
+      <p>Claude reçoit k=5 chunks numérotés [SOURCE 1] à [SOURCE 5]. Sa réponse contient "...comme le précise <strong>[SOURCE 7]</strong>...". [SOURCE 7] n'existe pas dans les chunks fournis. Ce n'est pas une hallucination de contenu — l'information peut être correcte — mais la traçabilité est rompue. Le client ne peut pas vérifier [SOURCE 7] dans notre corpus.</p>
+    </div>
+    <div class="callout gold">
+      <div class="callout-title">Pourquoi ça arrive</div>
+      <p>Claude connaît le GDPR par cœur. Il peut avoir l'information correcte en mémoire, la citer, et lui attribuer un numéro de source qui "devrait" être là — mais qui dépasse k. C'est une erreur de bookkeeping du modèle, pas un mensonge. La réponse est souvent exacte, mais la traçabilité est rompue.</p>
+    </div>
+  </div>
+
+  <div class="callout info" style="margin-top:8px;">
+    <div class="callout-title">Distinction essentielle — Deux types de problèmes de traçabilité</div>
+    <p><strong>Type A — Sources fantômes</strong> : [SOURCE X] avec X &gt; k. Ce que détecte ce guardrail. Détectable par simple regex + comparaison entière, coût zéro, 0ms. Exemple : [SOURCE 7] cité alors que k=5.</p>
+    <p style="margin-top:8px;"><strong>Type B — Fidélité sémantique</strong> : [SOURCE 2] cité, mais son contenu ne supporte pas réellement le claim. Ce que mesure le pipeline LLM-as-judge (faithfulness). Coûte ~$0.02/requête si fait en temps réel — non adapté à chaque /search. Ce guardrail ne couvre <em>pas</em> ce cas.</p>
+  </div>
+
+  <!-- DESIGN — DEUX NIVEAUX -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Design — Deux niveaux de sévérité</h3>
+
+  <p style="color:var(--text-mid);margin-bottom:16px;">Pourquoi ne pas tout bloquer dès 1 source fantôme ? Parce qu'un seul fantôme peut être un simple off-by-one du modèle (citer [SOURCE 6] au lieu de [SOURCE 5] par décalage de comptage). Ce n'est pas la même gravité que citer [SOURCE 12] avec k=5. Deux niveaux permettent de graduer la réponse.</p>
+
+  <div class="two-col">
+    <div class="info-card">
+      <h4 style="color:var(--orange)">LOW — 1 source fantôme</h4>
+      <ul>
+        <li>Probable erreur de numérotation mineure ou off-by-one</li>
+        <li>La réponse est <strong>retournée</strong> avec un disclaimer ajouté</li>
+        <li>Warning log : <code>[GUARDRAIL LOW] 1 source fantôme : [6] — k=5</code></li>
+        <li>L'utilisateur est informé, peut relancer si nécessaire</li>
+        <li>UX préservée — on ne bloque pas pour 1 erreur mineure</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h4 style="color:var(--red)">HIGH — 2+ sources fantômes</h4>
+      <ul>
+        <li>Le modèle s'est affranchi massivement des sources fournies</li>
+        <li>La réponse est <strong>bloquée</strong> — HTTP 503 retourné</li>
+        <li>Warning log : <code>[GUARDRAIL HIGH] 2 sources : [7, 9] — k=5</code></li>
+        <li>Client : relancer la requête (LLMs non-déterministes) ou augmenter k</li>
+        <li>503 et non 500 : le service se déclare incapable de garantir la traçabilité</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- IMPLÉMENTATION -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Implémentation — check_hallucination_guardrail()</h3>
+
+  <p style="color:var(--text-mid);margin-bottom:16px;">La fonction prend la réponse brute de Claude et le nombre de chunks réellement fournis après reranking. Elle extrait tous les <code>[SOURCE X]</code> avec un regex, compare chaque numéro à la plage <code>[1, n_chunks]</code>, et retourne un dict avec la sévérité, la liste des fantômes, et la réponse patchée (ou None si HIGH).</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">api/search.py — check_hallucination_guardrail()</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-flag">def</span> <span class="c-cmd">check_hallucination_guardrail</span>(
+    response: <span class="c-string">str</span>,
+    n_chunks: <span class="c-string">int</span>,        <span class="c-comment"># len(final_chunks) — après reranking, pas k</span>
+    language: <span class="c-string">str</span> = <span class="c-string">"fr"</span>,
+) -> <span class="c-string">dict</span>:
+
+    <span class="c-comment"># Extrait tous les [SOURCE X] — uniquement les entiers</span>
+    cited_numbers = [
+        <span class="c-flag">int</span>(x) <span class="c-flag">for</span> x <span class="c-flag">in</span> re.findall(<span class="c-string">r'\[SOURCE\s+(\d+)\]'</span>, response)
+    ]
+
+    <span class="c-flag">if not</span> cited_numbers:
+        <span class="c-flag">return</span> {<span class="c-string">"severity"</span>: <span class="c-string">"ok"</span>, <span class="c-string">"flagged"</span>: <span class="c-flag">False</span>, ...}
+
+    <span class="c-comment"># Fantômes = numéros hors plage [1, n_chunks]</span>
+    <span class="c-comment"># SOURCE 0 est aussi fantôme (numérotation commence à 1)</span>
+    ghost_sources = sorted([x <span class="c-flag">for</span> x <span class="c-flag">in</span> <span class="c-flag">set</span>(cited_numbers) <span class="c-flag">if</span> x < 1 <span class="c-flag">or</span> x > n_chunks])
+
+    <span class="c-flag">if not</span> ghost_sources:
+        <span class="c-flag">return</span> {<span class="c-string">"severity"</span>: <span class="c-string">"ok"</span>, <span class="c-string">"flagged"</span>: <span class="c-flag">False</span>, ...}
+
+    <span class="c-flag">if</span> <span class="c-flag">len</span>(ghost_sources) >= _GUARDRAIL_HIGH_THRESHOLD:  <span class="c-comment"># 2+</span>
+        <span class="c-flag">return</span> {
+            <span class="c-string">"severity"</span>: <span class="c-string">"high"</span>, <span class="c-string">"flagged"</span>: <span class="c-flag">True</span>,
+            <span class="c-string">"response_patched"</span>: <span class="c-flag">None</span>,  <span class="c-comment"># None = bloquer dans search()</span>
+        }
+    <span class="c-flag">else</span>:                                                   <span class="c-comment"># exactement 1</span>
+        <span class="c-flag">return</span> {
+            <span class="c-string">"severity"</span>: <span class="c-string">"low"</span>, <span class="c-string">"flagged"</span>: <span class="c-flag">True</span>,
+            <span class="c-string">"response_patched"</span>: response + _GUARDRAIL_DISCLAIMER_FR,
+        }</pre>
+  </div>
+
+  <!-- INTÉGRATION PIPELINE -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Intégration dans le pipeline — Après generate_answer()</h3>
+
+  <p style="color:var(--text-mid);margin-bottom:16px;">Le guardrail est appelé à l'intérieur de <code>generate_answer()</code>, juste après la réponse Claude et avant le parsing des citations. La fonction retourne maintenant 4 valeurs au lieu de 3 — le dict guardrail est propagé jusqu'à l'endpoint <code>search()</code> qui gère le cas HIGH.</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">api/search.py — Intégration dans search() et generate_answer()</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-comment"># Dans generate_answer() — après answer = message.content[0].text</span>
+guardrail = check_hallucination_guardrail(
+    response  = answer,
+    n_chunks  = <span class="c-flag">len</span>(chunks),  <span class="c-comment"># chunks fournis réels, pas k</span>
+    language  = language,
+)
+<span class="c-flag">if</span> guardrail[<span class="c-string">"flagged"</span>]:
+    logger.warning(guardrail[<span class="c-string">"detail"</span>])
+answer = guardrail[<span class="c-string">"response_patched"</span>] <span class="c-flag">or</span> answer
+
+<span class="c-comment"># generate_answer() retourne maintenant 4 valeurs</span>
+<span class="c-flag">return</span> answer, citations, model_id, guardrail
+
+<span class="c-comment"># ─────────────────────────────────────────────────────</span>
+
+<span class="c-comment"># Dans search() — après l'appel à generate_answer()</span>
+answer, citations, model_used, guardrail = <span class="c-flag">await</span> generate_answer(...)
+
+<span class="c-comment"># Gestion HIGH uniquement — LOW déjà traité dans generate_answer()</span>
+<span class="c-comment"># Pourquoi 503 ? Service incapable de garantir la traçabilité</span>
+<span class="c-comment"># pour cette réponse spécifique. Pas un crash (500), pas une</span>
+<span class="c-comment"># erreur client (4xx). Le service se déclare délibérément.</span>
+<span class="c-flag">if</span> guardrail[<span class="c-string">"severity"</span>] == <span class="c-string">"high"</span>:
+    ghost_list = <span class="c-string">", "</span>.join(<span class="c-string">f"[SOURCE {x}]"</span> <span class="c-flag">for</span> x <span class="c-flag">in</span> guardrail[<span class="c-string">"ghost_sources"</span>])
+    <span class="c-flag">raise</span> HTTPException(
+        status_code = <span class="c-flag">503</span>,
+        detail      = (
+            <span class="c-string">f"Réponse non conforme : {len(guardrail['ghost_sources'])} source(s) "</span>
+            <span class="c-string">f"non traçable(s) ({ghost_list}). Relancez ou augmentez k."</span>
+        ),
+    )</pre>
+  </div>
+
+  <!-- DISCLAIMER LOW -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Disclaimer — Texte ajouté en cas de LOW</h3>
+
+  <p style="color:var(--text-mid);margin-bottom:16px;">Le disclaimer est volontairement court, non-alarmiste, et ne révèle pas les détails internes (numéros de sources, valeur de k). Il informe l'utilisateur sans casser l'UX.</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">api/search.py — _GUARDRAIL_DISCLAIMER_FR</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-warn">⚠ Note : Cette réponse contient une référence à une source non disponible</span>
+<span class="c-warn">dans les documents consultés. Les informations citées sans source directe</span>
+<span class="c-warn">proviennent de la connaissance générale du modèle et ne sont pas directement</span>
+<span class="c-warn">vérifiables via notre corpus réglementaire.</span></pre>
+  </div>
+
+  <!-- CE QU'ON NE DÉTECTE PAS -->
+  <div class="callout warning" style="margin-top:24px;">
+    <div class="callout-title">Limites — Ce que ce guardrail ne couvre pas volontairement</div>
+    <p><strong>[SOURCE X] avec contenu incorrect (Type B)</strong> : si Claude cite [SOURCE 2] correctement mais que le contenu de [SOURCE 2] ne supporte pas réellement le claim, ce guardrail ne le détecte pas. C'est couvert par le pipeline LLM-as-judge (faithfulness). Exécuter ce pipeline sur chaque requête coûterait ~$0.02/req — non adapté à la production.</p>
+    <p style="margin-top:8px;"><strong>Citations en texte libre</strong> : "Article 17 du GDPR" sans [SOURCE X] explicite n'est pas intercepté. Ces cas sont rares avec notre prompt (la règle INTERDIT + obligation de citation est forte), mais pas impossibles.</p>
+    <p style="margin-top:8px;"><strong>Mode fallback (sans LLM)</strong> : le guardrail est skippé. La réponse fallback ne contient pas de [SOURCE X], donc il n'y a rien à vérifier.</p>
+  </div>
+
+  <!-- SYNTHÈSE -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Synthèse — Deux guardrails complémentaires</h3>
+
+  <table class="ref-table">
+    <thead><tr><th>Guardrail</th><th>Détecte</th><th>Coût</th><th>Timing</th><th>Statut</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Niveau 1 — Sources fantômes</strong></td>
+        <td>[SOURCE X] avec X &gt; k — citation non traçable</td>
+        <td><span style="color:var(--green);font-family:var(--mono)">0€ · ~0ms</span></td>
+        <td>Chaque requête /search</td>
+        <td><span class="badge green">Implémenté ✓</span></td>
+      </tr>
+      <tr>
+        <td><strong>Niveau 2 — Fidélité sémantique</strong></td>
+        <td>[SOURCE X] cité mais contenu ne supporte pas le claim</td>
+        <td><span style="color:var(--orange);font-family:var(--mono)">~$0.02/req</span></td>
+        <td>Batch périodique (pas temps réel)</td>
+        <td><span class="badge blue">Roadmap</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+</section>
+
 
 
 <!-- SECTION — DOCKER -->
@@ -1709,6 +1899,7 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
       <tr><td>Faithfulness</td><td><span style="color:var(--green);font-family:var(--mono)">88.5% ✓</span></td><td>k=5, prompt v1.1. Au-dessus du seuil 85%. Plafond structurel ~88% identifié. Voir section Évaluation.</td></tr>
       <tr><td>Filtres metadata</td><td><span style="color:var(--green);font-family:var(--mono)">4 actifs</span></td><td>regulation, segment_type, article_number, language</td></tr>
       <tr><td>Injection patterns</td><td><span style="color:var(--green);font-family:var(--mono)">18 regex</span></td><td>+ 3 heuristiques structurelles</td></tr>
+      <tr><td>Hallucination guardrail</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>Sources fantômes détectées. LOW (1) : disclaimer + warning. HIGH (2+) : HTTP 503 bloquant.</td></tr>
       <tr><td>Docker</td><td><span style="color:var(--green);font-family:var(--mono)">Opérationnel ✓</span></td><td>CPU container — claude-sonnet-4-20250514 confirmé</td></tr>
       <tr><td>Temps total /search (Docker)</td><td><span style="color:var(--gold2);font-family:var(--mono)">~13s</span></td><td>DEVICE=cpu — comparable au local MPS</td></tr>
     </tbody>
@@ -1717,7 +1908,9 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
   <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">État Git — main branch</h3>
   <div class="code-block">
     <div class="code-header"><span class="code-label">git log --oneline</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
-    <pre><span class="c-hash">latest </span> <span class="c-ok">fix(docker): add anthropic to requirements.txt — LLM fallback résolu</span>
+    <pre><span class="c-hash">latest </span> <span class="c-ok">feat(guardrail): hallucination guardrail — detection sources fantomes</span>
+<span class="c-hash">b3e9f1a</span> perf(prompt): faithfulness 88.5% — patch build_prompt + docs v4.0
+<span class="c-hash">a1c4d7e</span> fix(docker): add anthropic to requirements.txt — LLM fallback résolu
 <span class="c-hash">9d479dc</span> feat(docker): Dockerfile + compose + .dockerignore + .env.example
 <span class="c-hash">f3a1e9c</span> eval: fix dataset expected_ids + default output path → 100% recall@5
 <span class="c-hash">e7d2b8f</span> feat(security): add prompt injection defense with regex + structural heuristics
