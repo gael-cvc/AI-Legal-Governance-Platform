@@ -259,7 +259,9 @@ app.add_middleware(
 
 from api.health import router as health_router
 from api.search import router as search_router
+from api.auth_router import router as auth_router
 
+app.include_router(auth_router)
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(search_router, prefix="/api/v1")
 

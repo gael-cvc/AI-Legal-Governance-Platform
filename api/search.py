@@ -103,7 +103,9 @@ import re
 import time
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from .auth import TokenData, authenticated_and_rate_limited
+
 
 from .models import (
     ChunkResult,
@@ -880,7 +882,10 @@ async def generate_answer(
     ),
     tags=["Search"],
 )
-async def search(request: SearchRequest) -> SearchResponse:
+async def search(
+    request:      SearchRequest,
+    current_user: TokenData = Depends(authenticated_and_rate_limited),
+) -> SearchResponse:
     """
     Orchestre les 4 étapes du pipeline RAG pour répondre à une question juridique.
 
