@@ -250,6 +250,22 @@ class SearchRequest(BaseModel):
         ),
     )
 
+    model_config = {
+        # json_schema_extra définit l'exemple affiché dans le Swagger UI
+        # quand on clique "Try it out" — les champs sont pré-remplis.
+        # C'est la question qui marche le mieux sur notre corpus GDPR.
+        "json_schema_extra": {
+            "example": {
+                "question":            "What are the obligations of a data controller under GDPR?",
+                "k":                   5,
+                "use_reranking":       True,
+                "use_query_expansion": True,
+                "language":            "fr",
+                "min_score":           0.35,
+            }
+        }
+    }
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # RESPONSE SCHEMAS
