@@ -20,3 +20,4 @@ __pycache__/
 logs/
 evaluation/results/
 models_cache/
+logs/

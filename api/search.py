@@ -105,6 +105,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from .auth import TokenData, authenticated_and_rate_limited
+from .audit_log import build_audit_entry, generate_request_id, write_audit_log
 
 
 from .models import (
@@ -902,7 +903,8 @@ async def search(
     # Récupère les singletons chargés au démarrage
     from .main import get_embedder, get_reranker, get_vector_store
 
-    t_start  = time.perf_counter()
+    t_start    = time.perf_counter()
+    request_id = generate_request_id()  # identifiant unique pour tracer cette requête dans les logs
     store    = get_vector_store()
     embedder = get_embedder()
     reranker = get_reranker()  # peut être None si chargement échoué
@@ -1041,8 +1043,34 @@ async def search(
 
     logger.info(
         f"[DONE] {elapsed_ms:.0f}ms — "
-        f"FAISS: {n_retrieved} → reranking → LLM: {n_used} chunks utilisés"
+        f"FAISS: {n_retrieved} → reranking → LLM: {n_used} chunks utilisés | "
+        f"client={current_user.client} | request_id={request_id}"
     )
+
+    # ── ÉTAPE 6 : Audit Log ───────────────────────────────────────────────────
+    # On écrit une entrée JSONL dans logs/audit/audit.jsonl.
+    # L'écriture est synchrone mais négligeable (~0.1ms).
+    # Elle ne fait jamais planter la requête (try/except dans write_audit_log).
+    write_audit_log(build_audit_entry(
+        request_id              = request_id,
+        user_sub                = current_user.sub,
+        user_plan               = current_user.plan,
+        user_client             = current_user.client,
+        question                = request.question,
+        regulation              = request.regulation.value if request.regulation else None,
+        k                       = request.k,
+        language                = request.language.value,
+        use_reranking           = request.use_reranking,
+        n_chunks_retrieved      = n_retrieved,
+        n_chunks_used           = n_used,
+        sources_used            = [c.get("segment_id", "") for c in final_chunks],
+        model_used              = model_used,
+        query_expanded          = was_expanded,
+        guardrail_severity      = guardrail["severity"],
+        guardrail_ghost_sources = guardrail["ghost_sources"],
+        latency_ms              = elapsed_ms,
+        status                  = "success",
+    ))
 
     return SearchResponse(
         answer             = answer,
