@@ -94,6 +94,22 @@ CHANGEMENT v1.4 — HALLUCINATION GUARDRAIL :
   Le guardrail rend ce comportement visible et contrôlable.
   → Niveau LOW  : warning log + flag dans la réponse
   → Niveau HIGH : HTTP 503 (réponse bloquée, trop de sources fantômes)
+
+CHANGEMENT v1.5 — AUTH JWT + RATE LIMITING :
+  Ajout de authenticated_and_rate_limited() sur l'endpoint /search.
+  Deux modes : JWT Bearer (Authorization: Bearer <token>) ou API key (X-API-Key).
+  Plans : demo (10 req/min), cabinet (30 req/min), admin (200 req/min).
+
+CHANGEMENT v1.6 — AUDIT LOG JSONL :
+  write_audit_log() appelé après chaque requête réussie.
+  Enregistre : request_id, user, question, sources, guardrail, latence, status.
+  Fichier : logs/audit/audit.jsonl — rotation automatique (10MB × 5 fichiers).
+
+CHANGEMENT v1.7 — DISCLAIMER LÉGAL AUTOMATIQUE :
+  Ajout de build_legal_disclaimer() — texte déontologique ajouté en fin de réponse.
+  Rappelle que le système est un outil d'aide à la recherche, pas un conseil juridique.
+  Obligatoire pour tout déploiement cabinet. Configurable via DISABLE_DISCLAIMER=true.
+  Deux variantes : FR et EN, selon request.language.
 """
 
 from __future__ import annotations
@@ -658,6 +674,95 @@ def check_hallucination_guardrail(
         }
 
 
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DISCLAIMER LÉGAL AUTOMATIQUE
+# ══════════════════════════════════════════════════════════════════════════════
+
+# CONTEXTE — POURQUOI UN DISCLAIMER EST NÉCESSAIRE :
+#
+# Ce système produit des réponses juridiques à partir de textes réglementaires.
+# Il est performant (recall@5 : 100%, faithfulness : 88.5%) mais reste un outil
+# d'aide à la recherche, pas un conseiller juridique.
+#
+# Deux raisons d'imposer un disclaimer systématique :
+#
+# 1. DÉONTOLOGIE :
+#    En France, le Conseil National des Barreaux (CNB) et le Règlement Intérieur
+#    National (RIN) imposent que tout outil d'aide juridique précise clairement
+#    qu'il ne remplace pas le conseil d'un avocat. Même les grands cabinets
+#    (Clifford Chance, Linklaters) ajoutent ce type de mention sur leurs outils IA.
+#
+# 2. RESPONSABILITÉ :
+#    Sans disclaimer, si un utilisateur prend une décision erronée basée sur
+#    une réponse du système, la responsabilité du cabinet qui déploie l'outil
+#    pourrait être engagée. Le disclaimer n'élimine pas la responsabilité mais
+#    constitue une preuve que l'utilisateur a été informé des limites du système.
+#
+# DESIGN — PLACEMENT EN FIN DE RÉPONSE :
+#
+#    Option A (choisie) : Ajouter le disclaimer APRÈS la réponse Claude.
+#    → L'information principale reste lisible sans interruption.
+#    → Le disclaimer est clairement délimité par "---".
+#    → Le guardrail LOW avait déjà établi ce pattern (disclaimer en fin de réponse).
+#
+#    Option B (rejetée) : Modifier le prompt pour que Claude l'inclue lui-même.
+#    → Réduit la faithfulness (les tokens du disclaimer comptent comme claims).
+#    → Moins contrôlable (Claude peut varier le texte).
+#
+# CONFIGURABILITÉ :
+#    DISABLE_DISCLAIMER=true dans .env pour désactiver (tests, évaluation).
+#    En production cabinet : toujours activé.
+
+import os as _os
+
+_DISCLAIMER_ENABLED = _os.getenv("DISABLE_DISCLAIMER", "false").lower() != "true"
+
+# Texte du disclaimer en français.
+# Calibré pour être court (non intrusif) mais juridiquement couvert.
+# "Aide à la recherche documentaire" ≠ "conseil juridique" — distinction clé.
+_DISCLAIMER_FR = (
+    "\n\n---\n"
+    "⚖️ *Ce système est un outil d'aide à la recherche documentaire juridique. "
+    "Les informations fournies sont extraites de textes réglementaires officiels "
+    "et ne constituent pas un conseil juridique. "
+    "Pour toute décision ayant des conséquences juridiques, consultez un avocat qualifié.*"
+)
+
+# Version anglaise — même contenu, même longueur.
+_DISCLAIMER_EN = (
+    "\n\n---\n"
+    "⚖️ *This system is a legal document research tool. "
+    "The information provided is extracted from official regulatory texts "
+    "and does not constitute legal advice. "
+    "For any decision with legal consequences, consult a qualified lawyer.*"
+)
+
+
+def build_legal_disclaimer(language: str = "fr") -> str:
+    """
+    Retourne le texte du disclaimer légal selon la langue.
+
+    PARAMÈTRE :
+        language : "fr" ou "en" — détermine la langue du disclaimer.
+                   Doit correspondre à request.language pour cohérence.
+
+    RETOURNE :
+        str vide si DISABLE_DISCLAIMER=true (mode test/évaluation).
+        str avec le disclaimer formaté sinon.
+
+    NOTE SUR LE FORMAT :
+        Le disclaimer commence par "\n\n---\n" pour créer une séparation
+        visuelle claire entre la réponse et la mention légale.
+        Compatible avec le format Markdown des réponses Claude.
+    """
+    if not _DISCLAIMER_ENABLED:
+        return ""
+
+    return _DISCLAIMER_FR if language == "fr" else _DISCLAIMER_EN
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ÉTAPE 4 : GÉNÉRATION LLM
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1072,8 +1177,14 @@ async def search(
         status                  = "success",
     ))
 
+    # ── ÉTAPE 7 : Disclaimer légal ───────────────────────────────────────────
+    # Ajouté APRÈS l'audit log pour ne pas impacter les métriques de faithfulness.
+    # Le disclaimer est purement informatif — il ne fait pas partie de la réponse
+    # évaluée par le pipeline LLM-as-judge.
+    answer_with_disclaimer = answer + build_legal_disclaimer(request.language.value)
+
     return SearchResponse(
-        answer             = answer,
+        answer             = answer_with_disclaimer,
         citations          = citations,
         sources            = sources,
         question           = request.question,
