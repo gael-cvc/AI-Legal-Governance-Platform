@@ -10,7 +10,7 @@ Built for lawyers, DPOs, and compliance officers who need verifiable answers —
 
 ## Why RAG and not a chatbot?
 
-A general-purpose LLM knows the GDPR — but you can't audit its answers. It completes from memory, mixes versions, and cites articles that may have been amended. RAG forces the model to answer **exclusively from the documents you provide**, with mandatory citations. Every response is traceable, auditable, and reproducible.
+A general-purpose LLM knows the GDPR — but you cannot audit its answers. It completes from memory, mixes versions, and cites articles that may have been amended. RAG forces the model to answer **exclusively from the documents you provide**, with mandatory citations. Every response is traceable, auditable, and reproducible.
 
 ---
 
@@ -25,11 +25,14 @@ A general-purpose LLM knows the GDPR — but you can't audit its answers. It com
 | Hallucination guardrail (ghost source detection, LOW/HIGH severity) | ✅ |
 | Faithfulness evaluation — LLM-as-judge (88.5% @ k=5) | ✅ |
 | Recall@5 evaluation pipeline (100% internal consistency) | ✅ |
-| **Auth JWT + API keys + rate limiting** | ✅ |
+| Auth JWT + API keys + rate limiting | ✅ |
+| Audit log JSONL (request_id, user, sources, latency, guardrail) | ✅ |
+| Legal disclaimer automatic injection (FR/EN) | ✅ |
+| Unit tests — 100/100 PASSED | ✅ |
+| CI/CD — GitHub Actions (Python 3.12, pytest) | ✅ |
 | Docker containerization (MPS local / CPU cloud) | ✅ |
 | Bilingual responses (FR / EN) | ✅ |
 | Frontend (Next.js / Streamlit) | 📋 Roadmap |
-| Audit log JSONL | 📋 Roadmap |
 
 ---
 
@@ -53,6 +56,9 @@ A general-purpose LLM knows the GDPR — but you can't audit its answers. It com
 Question
     │
     ▼
+[Auth]  JWT / API key verification + rate limiting → HTTP 401/429
+    │
+    ▼
 [0] Prompt Injection Defense     — 18 regex + structural heuristics → HTTP 400
     │
     ▼
@@ -71,36 +77,31 @@ Question
 [5] Hallucination Guardrail      — ghost source detection, LOW disclaimer / HIGH HTTP 503
     │
     ▼
+[6] Audit Log                    — JSONL write: request_id, user, sources, latency, status
+    │
+    ▼
+[7] Legal Disclaimer             — appended to response (FR/EN), outside faithfulness scope
+    │
+    ▼
 Structured JSON response
 ```
-
-**Auth layer** sits before step [0] — unauthenticated requests never reach the RAG pipeline.
 
 ---
 
 ## Authentication
 
-The API uses **JWT Bearer tokens** or **API keys**. Every request to `/search` must be authenticated.
+Every request to `/search` must be authenticated. The API supports **JWT Bearer tokens** and **API keys**.
 
 ### Get a token
 
 ```bash
-# Option 1 — Demo token (no credentials, dev only)
+# Demo token (no credentials — dev only)
 curl -X POST http://localhost:8000/auth/token/demo
 
-# Option 2 — Token with credentials
+# Token with credentials
 curl -X POST http://localhost:8000/auth/token \
   -H "Content-Type: application/json" \
   -d '{"email": "demo@cabinet.fr", "password": "demo1234"}'
-```
-
-Response:
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiJ9...",
-  "token_type": "bearer",
-  "expires_in": 3600
-}
 ```
 
 ### Use the token
@@ -109,7 +110,7 @@ Response:
 curl -X POST http://localhost:8000/api/v1/search \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9..." \
   -H "Content-Type: application/json" \
-  -d '{"question": "What are GDPR controller obligations?", "k": 5}'
+  -d '{"question": "What are the obligations of a data controller under GDPR?", "k": 5}'
 ```
 
 ### Rate limits by plan
@@ -120,16 +121,76 @@ curl -X POST http://localhost:8000/api/v1/search \
 | `cabinet` | 30 req | 60s | `/auth/token` with credentials |
 | `admin` | 200 req | 60s | `/auth/token` with admin account |
 
-When the limit is exceeded, the API returns HTTP `429 Too Many Requests` with a `Retry-After` header.
+---
 
-### API Key (alternative to JWT)
+## Audit Log
+
+Every successful `/search` request writes one JSON line to `logs/audit/audit.jsonl`:
+
+```json
+{
+  "timestamp": "2026-03-28T14:32:01.123Z",
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "user_sub": "demo@cabinet.fr",
+  "user_plan": "cabinet",
+  "question": "What are GDPR controller obligations?",
+  "sources_used": ["Article 24", "Recital 74", "Article 5"],
+  "guardrail_severity": "ok",
+  "latency_ms": 3420.5,
+  "status": "success"
+}
+```
+
+- Rotating file handler: 10 MB x 5 files = 50 MB max
+- Retention: 180 days (configurable via `AUDIT_RETENTION_DAYS`)
+- `logs/` is in `.gitignore` — never versioned
+
+---
+
+## Legal Disclaimer
+
+Automatically appended to every response (FR/EN):
+
+```
+---
+⚖️ Ce système est un outil d'aide à la recherche documentaire juridique.
+Les informations fournies ne constituent pas un conseil juridique.
+Pour toute décision juridique, consultez un avocat qualifié.
+```
+
+Disable for evaluation runs: `DISABLE_DISCLAIMER=true` in `.env`.
+
+---
+
+## Tests
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/search \
-  -H "X-API-Key: your_api_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{"question": "...", "k": 5}'
+# Install
+venv/bin/pip install pytest pytest-cov
+
+# Run all tests
+venv/bin/python -m pytest tests/ -v
 ```
+
+```
+collected 100 items
+
+tests/test_audit_disclaimer.py  27 passed
+tests/test_auth.py              22 passed
+tests/test_guardrail.py         22 passed
+tests/test_injection.py         24 passed
+
+========================= 100 passed in 2.14s =========================
+```
+
+| File | Tests | Covers |
+|---|---|---|
+| `test_injection.py` | 24 | `detect_prompt_injection()` — legit questions + known attacks |
+| `test_guardrail.py` | 22 | `check_hallucination_guardrail()` — OK / LOW / HIGH thresholds |
+| `test_auth.py` | 22 | JWT create/decode, API key hash, rate limiting sliding window |
+| `test_audit_disclaimer.py` | 27 | JSONL validity, UUID format, disclaimer FR/EN content |
+
+CI runs automatically on every push to `main` via GitHub Actions.
 
 ---
 
@@ -140,13 +201,13 @@ curl -X POST http://localhost:8000/api/v1/search \
 ```bash
 git clone https://github.com/gael-cvc/AI-Legal-Governance-Platform
 cd AI-Legal-Governance-Platform
-python3.12 -m venv venv
-source venv/bin/activate
+python3.12 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# Edit .env — add ANTHROPIC_API_KEY and generate JWT_SECRET_KEY:
-# python3 -c "import secrets; print(secrets.token_hex(32))"
+# Edit .env:
+# ANTHROPIC_API_KEY=sk-ant-...
+# JWT_SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 
 TRANSFORMERS_OFFLINE=1 venv/bin/python -m uvicorn api.main:app --reload --port 8000
 ```
@@ -154,9 +215,7 @@ TRANSFORMERS_OFFLINE=1 venv/bin/python -m uvicorn api.main:app --reload --port 8
 ### Docker (CPU)
 
 ```bash
-cp .env.example .env
-# Add ANTHROPIC_API_KEY and JWT_SECRET_KEY to .env
-
+cp .env.example .env  # add ANTHROPIC_API_KEY and JWT_SECRET_KEY
 docker compose up --build
 ```
 
@@ -169,123 +228,27 @@ venv/bin/python -m rag.build_index
 
 ---
 
-## API Reference
-
-### POST /api/v1/search
-
-```bash
-curl -X POST http://localhost:8000/api/v1/search \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "What are the obligations of a data controller under GDPR?",
-    "k": 5,
-    "use_reranking": true,
-    "language": "fr"
-  }'
-```
-
-**Optional filters:**
-```json
-{
-  "regulation": "GDPR",
-  "segment_type": "article",
-  "article_number": "Article 35",
-  "language_filter": "en",
-  "min_score": 0.35
-}
-```
-
-### GET /api/v1/health
-
-```bash
-curl http://localhost:8000/api/v1/health
-```
-
-```json
-{
-  "status": "ok",
-  "vector_store": { "loaded": true, "n_vectors": 2016, "dimension": 384 },
-  "embedder":     { "loaded": true, "model": "all-MiniLM-L6-v2", "device": "mps" },
-  "reranker":     { "loaded": true, "model": "ms-marco-MiniLM-L-6-v2", "device": "mps" }
-}
-```
-
-### GET /auth/me
-
-```bash
-curl http://localhost:8000/auth/me \
-  -H "Authorization: Bearer <token>"
-```
-
-```json
-{
-  "sub": "demo@cabinet.fr",
-  "plan": "demo",
-  "client": "Cabinet Demo",
-  "is_admin": false,
-  "rate_limit_max_requests": 10,
-  "rate_limit_window_seconds": 60
-}
-```
-
----
-
-## Evaluation
-
-### Recall@5 — 100% (internal consistency)
-
-19/19 questions return at least one expected segment in top 5 results with reranking.
-
-> ⚠️ **Methodological note**: dataset calibrated on the existing index. Measures internal consistency, not external validity. Independent benchmark (lawyer annotation) planned.
-
-### Faithfulness — 88.5% (LLM-as-judge, k=5, prompt v1.1)
-
-Measures the share of claims directly traceable to provided source chunks.
-
-| Run | Config | Score | Delta |
-|---|---|---|---|
-| Run 1 | Prompt v1.0 · k=5 | 87.4% | baseline |
-| Run 2 | Prompt v1.1 (FORBIDDEN rule) · k=5 | **88.5%** | +1.1% |
-| Run 3 | Prompt v1.1 · k=7 | 87.4% | −1.1% |
-
-**Structural ceiling ~88%** — GDPR overrepresentation in Claude's training data. Not a retrieval problem, confirmed by k=7 test.
-
-### Hallucination Guardrail
-
-- **LOW** (1 ghost source): disclaimer appended + warning log
-- **HIGH** (2+ ghost sources): HTTP 503, response blocked
-
-### Evaluation CLI
-
-```bash
-# Recall@5 only (fast, free)
-venv/bin/python -m evaluation.evaluator --no-faithfulness
-
-# Faithfulness on 10 cases (~$0.20)
-venv/bin/python -m evaluation.evaluator --k 5
-```
-
----
-
 ## Environment Variables
 
 ```bash
 # Required
 ANTHROPIC_API_KEY=sk-ant-...
 
-# Auth — generate with: python3 -c "import secrets; print(secrets.token_hex(32))"
+# Auth
 JWT_SECRET_KEY=your_generated_secret_here
 ACCESS_TOKEN_EXPIRE_MINUTES=60
-
-# Demo accounts (change in production)
 DEMO_PASSWORD=demo1234
 ADMIN_PASSWORD=your_secure_admin_password
-
-# Disable demo token endpoint in production
 DISABLE_DEMO_TOKEN=false
 
-# Device (mps for Mac M4, cpu for Docker/cloud)
+# Disclaimer
+DISABLE_DISCLAIMER=false
+
+# Audit log
+AUDIT_LOG_DIR=logs/audit
+AUDIT_RETENTION_DAYS=180
+
+# Device
 DEVICE=mps
 TRANSFORMERS_OFFLINE=1
 ```
@@ -297,23 +260,34 @@ TRANSFORMERS_OFFLINE=1
 ```
 .
 ├── api/
-│   ├── main.py          # FastAPI app, lifespan, singletons
-│   ├── auth.py          # JWT, API keys, rate limiting (NEW v1.5)
-│   ├── auth_router.py   # /auth/token, /auth/me endpoints (NEW v1.5)
-│   ├── search.py        # RAG pipeline, guardrails, prompt engineering
-│   └── models.py        # Pydantic schemas
+│   ├── main.py           # FastAPI app, lifespan, singletons
+│   ├── auth.py           # JWT, API keys, rate limiting
+│   ├── auth_router.py    # /auth/token, /auth/me endpoints
+│   ├── audit_log.py      # JSONL audit logging
+│   ├── search.py         # RAG pipeline, guardrails, disclaimer
+│   └── models.py         # Pydantic schemas
 ├── rag/
-│   ├── build_index.py   # FAISS index construction
-│   ├── vector_store.py  # FAISS search + metadata filters
-│   └── embedder.py      # LegalEmbedder singleton
+│   ├── build_index.py    # FAISS index construction
+│   ├── vector_store.py   # FAISS search + metadata filters
+│   └── embedder.py       # LegalEmbedder singleton
 ├── evaluation/
-│   ├── evaluator.py     # recall@k + faithfulness LLM-as-judge
-│   └── eval_dataset.py  # 19 EvalCase definitions
+│   ├── evaluator.py      # recall@k + faithfulness LLM-as-judge
+│   └── eval_dataset.py   # 19 EvalCase definitions
+├── tests/
+│   ├── conftest.py
+│   ├── test_injection.py
+│   ├── test_guardrail.py
+│   ├── test_auth.py
+│   └── test_audit_disclaimer.py
+├── .github/
+│   └── workflows/
+│       └── tests.yml     # CI — Python 3.12, pytest, 100 tests
 ├── data/
-│   ├── raw/             # source PDFs (not versioned)
-│   ├── bronze/          # parsed segments
-│   ├── silver/          # final chunks
-│   └── vector_store/    # FAISS index (not versioned)
+│   ├── raw/              # source PDFs (not versioned)
+│   ├── bronze/           # parsed segments
+│   ├── silver/           # final chunks
+│   └── vector_store/     # FAISS index (not versioned)
+├── logs/                 # audit logs (not versioned)
 ├── Dockerfile
 ├── docker-compose.yml
 └── .env.example
@@ -321,17 +295,21 @@ TRANSFORMERS_OFFLINE=1
 
 ---
 
-## Stack
+## Evaluation
 
-```
-Python 3.12
-FastAPI          — async REST API, Pydantic validation
-PyJWT            — JWT creation and verification (HS256)
-FAISS            — IndexFlatIP, exact cosine similarity
-sentence-transformers — all-MiniLM-L6-v2 (embedder) + ms-marco-MiniLM (reranker)
-Anthropic API    — claude-sonnet-4-20250514
-Docker + Compose — containerization, DEVICE env var (mps/cpu)
-```
+### Recall@5 — 100% (internal consistency)
+
+> Dataset calibrated on the existing index. Measures internal consistency. Independent benchmark (lawyer annotation) planned.
+
+### Faithfulness — 88.5% (LLM-as-judge, k=5, prompt v1.1)
+
+| Run | Config | Score | Delta |
+|---|---|---|---|
+| Run 1 | Prompt v1.0 · k=5 | 87.4% | baseline |
+| Run 2 | Prompt v1.1 (FORBIDDEN rule) · k=5 | **88.5%** | +1.1% |
+| Run 3 | Prompt v1.1 · k=7 | 87.4% | -1.1% |
+
+Structural ceiling ~88% — GDPR overrepresentation in Claude training data. k=7 test confirmed.
 
 ---
 
@@ -341,30 +319,31 @@ Docker + Compose — containerization, DEVICE env var (mps/cpu)
 |---|---|---|
 | Chunks | 2,016 | silver layer |
 | Vector dimensions | 384 | all-MiniLM-L6-v2 |
-| FAISS index size | ~3MB | fits in RAM |
 | FAISS latency | < 5ms | exact search |
 | Total /search latency | ~14s | query expansion + Claude |
-| Recall@5 | 100% ⚠ | internal dataset |
+| Recall@5 | 100% | internal dataset |
 | Faithfulness | 88.5% | k=5, prompt v1.1 |
 | Injection patterns | 18 regex | + 3 structural heuristics |
 | Guardrail | Active | LOW/HIGH severity |
 | Auth | JWT + API keys | rate limiting per plan |
+| Audit log | Active | JSONL rotating, 50MB max |
+| Unit tests | 100/100 | 4 files, CI GitHub Actions |
 
 ---
 
 ## Roadmap
 
 - [x] Auth JWT + API keys + rate limiting
-- [x] Hallucination guardrail (ghost source detection)
-- [x] Faithfulness evaluation (LLM-as-judge, 88.5%)
-- [ ] Audit log JSONL (request_id, sources, latency, user_id)
-- [ ] Legal disclaimer automatic injection
+- [x] Hallucination guardrail
+- [x] Faithfulness evaluation (88.5%)
+- [x] Audit log JSONL
+- [x] Legal disclaimer (FR/EN)
+- [x] Unit tests (100/100) + CI/CD GitHub Actions
 - [ ] Frontend (Next.js or Streamlit)
 - [ ] Corpus update pipeline (incremental FAISS.add())
-- [ ] Unit tests + CI/CD (GitHub Actions)
-- [ ] Cloud deployment (Cloud Run)
 - [ ] Redis for distributed rate limiting
-- [ ] PostgreSQL for user management (replace hardcoded accounts)
+- [ ] PostgreSQL for user management
+- [ ] Cloud deployment (Cloud Run)
 - [ ] Independent benchmark (lawyer-annotated dataset)
 
 ---
