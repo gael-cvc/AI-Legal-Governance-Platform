@@ -175,8 +175,8 @@ pre { padding:20px 24px; font-family:var(--mono); font-size:12px; line-height:1.
     <a class="nav-item" href="#metadata-filters">Étape 5 — Metadata Filtering</a>
     <a class="nav-item" href="#evaluation">Étape 6 — Évaluation RAG</a>
     <a class="nav-item" href="#injection">Étape 7 — Injection Defense</a>
-    <a class="nav-item" href="#guardrail">Étape 7b — Hallucination Guardrail</a>
     <a class="nav-item" href="#docker">Étape 8 — Docker & Déploiement</a>
+    <a class="nav-item" href="#auth">Étape 9 — Auth JWT &amp; Rate Limiting</a>
   </div>
   <div class="nav-section">
     <div class="nav-section-title">Bilan</div>
@@ -188,7 +188,7 @@ pre { padding:20px 24px; font-family:var(--mono); font-size:12px; line-height:1.
 
 <!-- HERO -->
 <div class="hero">
-  <div class="hero-tag">Documentation Technique · v3.0</div>
+  <div class="hero-tag">Documentation Technique · v5.0</div>
   <h1>AI Legal <span>Governance</span><br>Intelligence Platform</h1>
   <p class="hero-sub">Architecture complète d'un système RAG (Retrieval-Augmented Generation) appliqué au droit européen. Chaque décision technique documentée, justifiée, et mise en perspective selon les contextes d'usage — du prototype au déploiement containerisé.</p>
   <div class="hero-meta">
@@ -1342,8 +1342,8 @@ score = len(supported) / len(all_claims)</pre>
     <div class="info-card">
       <h4>Court terme — Quick wins (0€)</h4>
       <ul>
-        <li><strong style="color:var(--green)">✓ Hallucination guardrail niveau 1 : implémenté</strong> — LOW/HIGH sévérité, HTTP 503 bloquant</li>
-        <li><strong style="color:var(--green)">✓ Prompt versioning</strong> — chaque modification build_prompt() commitée avec score (v1.0 : 87.4% → v1.1 : 88.5%)</li>
+        <li>Hallucination guardrail niveau 1 : vérifier que les [SOURCE X] citées existent (30 min)</li>
+        <li>Prompt versioning dans <code>prompts/CHANGELOG.md</code> — tracker chaque modification + score</li>
         <li>Re-run faithfulness à chaque modification de <code>build_prompt()</code></li>
       </ul>
     </div>
@@ -1478,195 +1478,6 @@ is_injection, reason = detect_prompt_injection(request.question)
     </div>
   </div>
 </section>
-
-
-
-<!-- SECTION — HALLUCINATION GUARDRAIL -->
-<section class="section" id="guardrail">
-  <div class="section-header">
-    <div class="section-number">07b</div>
-    <div class="section-title-block">
-      <h2>Étape 7b — Hallucination Guardrail</h2>
-      <p>Sources fantômes · Deux niveaux de sévérité · LOW warning · HIGH HTTP 503</p>
-    </div>
-  </div>
-
-  <!-- POURQUOI -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:0 0 16px;">Pourquoi un guardrail ? — La limite de la règle INTERDIT</h3>
-
-  <p style="color:var(--text-mid);margin-bottom:20px;">Le patch du prompt v1.1 (règle INTERDIT) a amélioré la faithfulness de 87.4% à 88.5%. Mais il ne résout pas tout : Claude peut respecter la règle sur le <em>contenu</em> des affirmations et pourtant citer un numéro de source qui n'existe pas. C'est le problème des <strong style="color:#fff">sources fantômes</strong>.</p>
-
-  <div class="two-col">
-    <div class="callout danger">
-      <div class="callout-title">Le problème — Source fantôme</div>
-      <p>Claude reçoit k=5 chunks numérotés [SOURCE 1] à [SOURCE 5]. Sa réponse contient "...comme le précise <strong>[SOURCE 7]</strong>...". [SOURCE 7] n'existe pas dans les chunks fournis. Ce n'est pas une hallucination de contenu — l'information peut être correcte — mais la traçabilité est rompue. Le client ne peut pas vérifier [SOURCE 7] dans notre corpus.</p>
-    </div>
-    <div class="callout gold">
-      <div class="callout-title">Pourquoi ça arrive</div>
-      <p>Claude connaît le GDPR par cœur. Il peut avoir l'information correcte en mémoire, la citer, et lui attribuer un numéro de source qui "devrait" être là — mais qui dépasse k. C'est une erreur de bookkeeping du modèle, pas un mensonge. La réponse est souvent exacte, mais la traçabilité est rompue.</p>
-    </div>
-  </div>
-
-  <div class="callout info" style="margin-top:8px;">
-    <div class="callout-title">Distinction essentielle — Deux types de problèmes de traçabilité</div>
-    <p><strong>Type A — Sources fantômes</strong> : [SOURCE X] avec X &gt; k. Ce que détecte ce guardrail. Détectable par simple regex + comparaison entière, coût zéro, 0ms. Exemple : [SOURCE 7] cité alors que k=5.</p>
-    <p style="margin-top:8px;"><strong>Type B — Fidélité sémantique</strong> : [SOURCE 2] cité, mais son contenu ne supporte pas réellement le claim. Ce que mesure le pipeline LLM-as-judge (faithfulness). Coûte ~$0.02/requête si fait en temps réel — non adapté à chaque /search. Ce guardrail ne couvre <em>pas</em> ce cas.</p>
-  </div>
-
-  <!-- DESIGN — DEUX NIVEAUX -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Design — Deux niveaux de sévérité</h3>
-
-  <p style="color:var(--text-mid);margin-bottom:16px;">Pourquoi ne pas tout bloquer dès 1 source fantôme ? Parce qu'un seul fantôme peut être un simple off-by-one du modèle (citer [SOURCE 6] au lieu de [SOURCE 5] par décalage de comptage). Ce n'est pas la même gravité que citer [SOURCE 12] avec k=5. Deux niveaux permettent de graduer la réponse.</p>
-
-  <div class="two-col">
-    <div class="info-card">
-      <h4 style="color:var(--orange)">LOW — 1 source fantôme</h4>
-      <ul>
-        <li>Probable erreur de numérotation mineure ou off-by-one</li>
-        <li>La réponse est <strong>retournée</strong> avec un disclaimer ajouté</li>
-        <li>Warning log : <code>[GUARDRAIL LOW] 1 source fantôme : [6] — k=5</code></li>
-        <li>L'utilisateur est informé, peut relancer si nécessaire</li>
-        <li>UX préservée — on ne bloque pas pour 1 erreur mineure</li>
-      </ul>
-    </div>
-    <div class="info-card">
-      <h4 style="color:var(--red)">HIGH — 2+ sources fantômes</h4>
-      <ul>
-        <li>Le modèle s'est affranchi massivement des sources fournies</li>
-        <li>La réponse est <strong>bloquée</strong> — HTTP 503 retourné</li>
-        <li>Warning log : <code>[GUARDRAIL HIGH] 2 sources : [7, 9] — k=5</code></li>
-        <li>Client : relancer la requête (LLMs non-déterministes) ou augmenter k</li>
-        <li>503 et non 500 : le service se déclare incapable de garantir la traçabilité</li>
-      </ul>
-    </div>
-  </div>
-
-  <!-- IMPLÉMENTATION -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Implémentation — check_hallucination_guardrail()</h3>
-
-  <p style="color:var(--text-mid);margin-bottom:16px;">La fonction prend la réponse brute de Claude et le nombre de chunks réellement fournis après reranking. Elle extrait tous les <code>[SOURCE X]</code> avec un regex, compare chaque numéro à la plage <code>[1, n_chunks]</code>, et retourne un dict avec la sévérité, la liste des fantômes, et la réponse patchée (ou None si HIGH).</p>
-
-  <div class="code-block">
-    <div class="code-header"><span class="code-label">api/search.py — check_hallucination_guardrail()</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
-    <pre><span class="c-flag">def</span> <span class="c-cmd">check_hallucination_guardrail</span>(
-    response: <span class="c-string">str</span>,
-    n_chunks: <span class="c-string">int</span>,        <span class="c-comment"># len(final_chunks) — après reranking, pas k</span>
-    language: <span class="c-string">str</span> = <span class="c-string">"fr"</span>,
-) -> <span class="c-string">dict</span>:
-
-    <span class="c-comment"># Extrait tous les [SOURCE X] — uniquement les entiers</span>
-    cited_numbers = [
-        <span class="c-flag">int</span>(x) <span class="c-flag">for</span> x <span class="c-flag">in</span> re.findall(<span class="c-string">r'\[SOURCE\s+(\d+)\]'</span>, response)
-    ]
-
-    <span class="c-flag">if not</span> cited_numbers:
-        <span class="c-flag">return</span> {<span class="c-string">"severity"</span>: <span class="c-string">"ok"</span>, <span class="c-string">"flagged"</span>: <span class="c-flag">False</span>, ...}
-
-    <span class="c-comment"># Fantômes = numéros hors plage [1, n_chunks]</span>
-    <span class="c-comment"># SOURCE 0 est aussi fantôme (numérotation commence à 1)</span>
-    ghost_sources = sorted([x <span class="c-flag">for</span> x <span class="c-flag">in</span> <span class="c-flag">set</span>(cited_numbers) <span class="c-flag">if</span> x < 1 <span class="c-flag">or</span> x > n_chunks])
-
-    <span class="c-flag">if not</span> ghost_sources:
-        <span class="c-flag">return</span> {<span class="c-string">"severity"</span>: <span class="c-string">"ok"</span>, <span class="c-string">"flagged"</span>: <span class="c-flag">False</span>, ...}
-
-    <span class="c-flag">if</span> <span class="c-flag">len</span>(ghost_sources) >= _GUARDRAIL_HIGH_THRESHOLD:  <span class="c-comment"># 2+</span>
-        <span class="c-flag">return</span> {
-            <span class="c-string">"severity"</span>: <span class="c-string">"high"</span>, <span class="c-string">"flagged"</span>: <span class="c-flag">True</span>,
-            <span class="c-string">"response_patched"</span>: <span class="c-flag">None</span>,  <span class="c-comment"># None = bloquer dans search()</span>
-        }
-    <span class="c-flag">else</span>:                                                   <span class="c-comment"># exactement 1</span>
-        <span class="c-flag">return</span> {
-            <span class="c-string">"severity"</span>: <span class="c-string">"low"</span>, <span class="c-string">"flagged"</span>: <span class="c-flag">True</span>,
-            <span class="c-string">"response_patched"</span>: response + _GUARDRAIL_DISCLAIMER_FR,
-        }</pre>
-  </div>
-
-  <!-- INTÉGRATION PIPELINE -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Intégration dans le pipeline — Après generate_answer()</h3>
-
-  <p style="color:var(--text-mid);margin-bottom:16px;">Le guardrail est appelé à l'intérieur de <code>generate_answer()</code>, juste après la réponse Claude et avant le parsing des citations. La fonction retourne maintenant 4 valeurs au lieu de 3 — le dict guardrail est propagé jusqu'à l'endpoint <code>search()</code> qui gère le cas HIGH.</p>
-
-  <div class="code-block">
-    <div class="code-header"><span class="code-label">api/search.py — Intégration dans search() et generate_answer()</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
-    <pre><span class="c-comment"># Dans generate_answer() — après answer = message.content[0].text</span>
-guardrail = check_hallucination_guardrail(
-    response  = answer,
-    n_chunks  = <span class="c-flag">len</span>(chunks),  <span class="c-comment"># chunks fournis réels, pas k</span>
-    language  = language,
-)
-<span class="c-flag">if</span> guardrail[<span class="c-string">"flagged"</span>]:
-    logger.warning(guardrail[<span class="c-string">"detail"</span>])
-answer = guardrail[<span class="c-string">"response_patched"</span>] <span class="c-flag">or</span> answer
-
-<span class="c-comment"># generate_answer() retourne maintenant 4 valeurs</span>
-<span class="c-flag">return</span> answer, citations, model_id, guardrail
-
-<span class="c-comment"># ─────────────────────────────────────────────────────</span>
-
-<span class="c-comment"># Dans search() — après l'appel à generate_answer()</span>
-answer, citations, model_used, guardrail = <span class="c-flag">await</span> generate_answer(...)
-
-<span class="c-comment"># Gestion HIGH uniquement — LOW déjà traité dans generate_answer()</span>
-<span class="c-comment"># Pourquoi 503 ? Service incapable de garantir la traçabilité</span>
-<span class="c-comment"># pour cette réponse spécifique. Pas un crash (500), pas une</span>
-<span class="c-comment"># erreur client (4xx). Le service se déclare délibérément.</span>
-<span class="c-flag">if</span> guardrail[<span class="c-string">"severity"</span>] == <span class="c-string">"high"</span>:
-    ghost_list = <span class="c-string">", "</span>.join(<span class="c-string">f"[SOURCE {x}]"</span> <span class="c-flag">for</span> x <span class="c-flag">in</span> guardrail[<span class="c-string">"ghost_sources"</span>])
-    <span class="c-flag">raise</span> HTTPException(
-        status_code = <span class="c-flag">503</span>,
-        detail      = (
-            <span class="c-string">f"Réponse non conforme : {len(guardrail['ghost_sources'])} source(s) "</span>
-            <span class="c-string">f"non traçable(s) ({ghost_list}). Relancez ou augmentez k."</span>
-        ),
-    )</pre>
-  </div>
-
-  <!-- DISCLAIMER LOW -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Disclaimer — Texte ajouté en cas de LOW</h3>
-
-  <p style="color:var(--text-mid);margin-bottom:16px;">Le disclaimer est volontairement court, non-alarmiste, et ne révèle pas les détails internes (numéros de sources, valeur de k). Il informe l'utilisateur sans casser l'UX.</p>
-
-  <div class="code-block">
-    <div class="code-header"><span class="code-label">api/search.py — _GUARDRAIL_DISCLAIMER_FR</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
-    <pre><span class="c-warn">⚠ Note : Cette réponse contient une référence à une source non disponible</span>
-<span class="c-warn">dans les documents consultés. Les informations citées sans source directe</span>
-<span class="c-warn">proviennent de la connaissance générale du modèle et ne sont pas directement</span>
-<span class="c-warn">vérifiables via notre corpus réglementaire.</span></pre>
-  </div>
-
-  <!-- CE QU'ON NE DÉTECTE PAS -->
-  <div class="callout warning" style="margin-top:24px;">
-    <div class="callout-title">Limites — Ce que ce guardrail ne couvre pas volontairement</div>
-    <p><strong>[SOURCE X] avec contenu incorrect (Type B)</strong> : si Claude cite [SOURCE 2] correctement mais que le contenu de [SOURCE 2] ne supporte pas réellement le claim, ce guardrail ne le détecte pas. C'est couvert par le pipeline LLM-as-judge (faithfulness). Exécuter ce pipeline sur chaque requête coûterait ~$0.02/req — non adapté à la production.</p>
-    <p style="margin-top:8px;"><strong>Citations en texte libre</strong> : "Article 17 du GDPR" sans [SOURCE X] explicite n'est pas intercepté. Ces cas sont rares avec notre prompt (la règle INTERDIT + obligation de citation est forte), mais pas impossibles.</p>
-    <p style="margin-top:8px;"><strong>Mode fallback (sans LLM)</strong> : le guardrail est skippé. La réponse fallback ne contient pas de [SOURCE X], donc il n'y a rien à vérifier.</p>
-  </div>
-
-  <!-- SYNTHÈSE -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Synthèse — Deux guardrails complémentaires</h3>
-
-  <table class="ref-table">
-    <thead><tr><th>Guardrail</th><th>Détecte</th><th>Coût</th><th>Timing</th><th>Statut</th></tr></thead>
-    <tbody>
-      <tr>
-        <td><strong>Niveau 1 — Sources fantômes</strong></td>
-        <td>[SOURCE X] avec X &gt; k — citation non traçable</td>
-        <td><span style="color:var(--green);font-family:var(--mono)">0€ · ~0ms</span></td>
-        <td>Chaque requête /search</td>
-        <td><span class="badge green">Implémenté ✓</span></td>
-      </tr>
-      <tr>
-        <td><strong>Niveau 2 — Fidélité sémantique</strong></td>
-        <td>[SOURCE X] cité mais contenu ne supporte pas le claim</td>
-        <td><span style="color:var(--orange);font-family:var(--mono)">~$0.02/req</span></td>
-        <td>Batch périodique (pas temps réel)</td>
-        <td><span class="badge blue">Roadmap</span></td>
-      </tr>
-    </tbody>
-  </table>
-
-</section>
-
 
 
 <!-- SECTION — DOCKER -->
@@ -1899,8 +1710,10 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
       <tr><td>Faithfulness</td><td><span style="color:var(--green);font-family:var(--mono)">88.5% ✓</span></td><td>k=5, prompt v1.1. Au-dessus du seuil 85%. Plafond structurel ~88% identifié. Voir section Évaluation.</td></tr>
       <tr><td>Filtres metadata</td><td><span style="color:var(--green);font-family:var(--mono)">4 actifs</span></td><td>regulation, segment_type, article_number, language</td></tr>
       <tr><td>Injection patterns</td><td><span style="color:var(--green);font-family:var(--mono)">18 regex</span></td><td>+ 3 heuristiques structurelles</td></tr>
-      <tr><td>Hallucination guardrail</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>Sources fantômes détectées. LOW (1) : disclaimer + warning. HIGH (2+) : HTTP 503 bloquant.</td></tr>
       <tr><td>Docker</td><td><span style="color:var(--green);font-family:var(--mono)">Opérationnel ✓</span></td><td>CPU container — claude-sonnet-4-20250514 confirmé</td></tr>
+      <tr><td>Auth JWT</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>JWT HS256 + API keys. Plans demo/cabinet/admin. Rate limiting fenêtre glissante.</td></tr>
+      <tr><td>Hallucination guardrail</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>Sources fantômes détectées. LOW : disclaimer. HIGH : HTTP 503.</td></tr>
+      <tr><td>Faithfulness</td><td><span style="color:var(--green);font-family:var(--mono)">88.5% ✓</span></td><td>k=5, prompt v1.1. Plafond structurel ~88% identifié.</td></tr>
       <tr><td>Temps total /search (Docker)</td><td><span style="color:var(--gold2);font-family:var(--mono)">~13s</span></td><td>DEVICE=cpu — comparable au local MPS</td></tr>
     </tbody>
   </table>
@@ -1908,7 +1721,8 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
   <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">État Git — main branch</h3>
   <div class="code-block">
     <div class="code-header"><span class="code-label">git log --oneline</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
-    <pre><span class="c-hash">latest </span> <span class="c-ok">feat(guardrail): hallucination guardrail — detection sources fantomes</span>
+    <pre><span class="c-hash">latest </span> <span class="c-ok">feat(auth): JWT + API key auth + rate limiting</span>
+<span class="c-hash">c8f2a1b</span> feat(guardrail): hallucination guardrail — detection sources fantomes
 <span class="c-hash">b3e9f1a</span> perf(prompt): faithfulness 88.5% — patch build_prompt + docs v4.0
 <span class="c-hash">a1c4d7e</span> fix(docker): add anthropic to requirements.txt — LLM fallback résolu
 <span class="c-hash">9d479dc</span> feat(docker): Dockerfile + compose + .dockerignore + .env.example
@@ -1926,9 +1740,334 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
 
   <div class="callout info" style="margin-top:32px;">
     <div class="callout-title">Roadmap Pro — Document séparé</div>
-    <p>Le plan de développement vers un déploiement professionnel est documenté dans le fichier <code>roadmap.html</code>. Il couvre 10 étapes priorisées : Auth JWT, rate limiting, audit log, disclaimer légal, hallucination guardrail, frontend, corpus update pipeline, tests unitaires, CONTRIBUTING.md, et monitoring cloud. Effort estimé total : ~2-3 jours. Coût total : ~0€.</p>
+    <p>Le plan de développement vers un déploiement professionnel est documenté dans le fichier <code>roadmap.html</code>. Auth JWT ✓ · Rate limiting ✓ · Hallucination guardrail ✓ · Faithfulness 88.5% ✓ — Prochaines étapes : audit log, disclaimer légal, frontend, corpus update pipeline, tests unitaires, monitoring cloud.</p>
   </div>
 </section>
+
+
+<!-- SECTION — AUTH JWT -->
+<section class="section" id="auth">
+  <div class="section-header">
+    <div class="section-number">09</div>
+    <div class="section-title-block">
+      <h2>Étape 9 — Authentification JWT &amp; Rate Limiting</h2>
+      <p>Sécurité · Qui peut appeler l'API · JWT HS256 · API Keys · Fenêtre glissante · HTTP 401 / 429</p>
+    </div>
+  </div>
+
+  <!-- POURQUOI -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:0 0 16px;">Pourquoi protéger l'API ? — Le problème concret</h3>
+
+  <p style="color:var(--text-mid);margin-bottom:20px;">Avant cette étape, l'API était entièrement ouverte. N'importe qui qui connaissait l'URL pouvait appeler <code>/search</code>. Chaque appel coûte environ <strong style="color:#fff">$0.015</strong> en crédits Anthropic (le LLM qui génère la réponse). Un bot automatique qui envoie 1000 requêtes en 10 minutes = <strong style="color:var(--orange)">$15 de facture en quelques minutes</strong>, sans qu'on puisse l'arrêter. Ce module ajoute deux verrous : <em>qui peut entrer</em> (authentification) et <em>combien de fois</em> (rate limiting).</p>
+
+  <div class="two-col">
+    <div class="callout danger">
+      <div class="callout-title">Avant — API ouverte</div>
+      <p>Tout le monde peut appeler <code>/search</code> sans se présenter. Aucune limite de fréquence. Un attaquant ou un bug peut générer des centaines d'appels et vider les crédits API en quelques minutes.</p>
+    </div>
+    <div class="callout success">
+      <div class="callout-title">Après — API protégée</div>
+      <p>Chaque requête doit présenter un <strong>badge numérique</strong> (token JWT ou API key). Sans badge valide → HTTP 401 refusé. Avec badge valide mais trop de requêtes → HTTP 429 ralentissement.</p>
+    </div>
+  </div>
+
+  <!-- GLOSSAIRE -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Glossaire — Définir les termes avant de continuer</h3>
+
+  <p style="color:var(--text-mid);margin-bottom:16px;">Ce module introduit beaucoup de termes techniques. Voici chacun expliqué simplement avant d'aller plus loin.</p>
+
+  <div class="two-col">
+    <div class="info-card">
+      <h4>🔐 Authentification</h4>
+      <p style="font-size:13px;color:var(--text-mid);">Répondre à la question <strong style="color:#fff">"Qui es-tu ?"</strong>. L'authentification vérifie l'identité de celui qui appelle l'API. Analogie : montrer sa carte d'identité à l'entrée d'un bâtiment. Sans authentification, l'API ne sait pas qui l'appelle.</p>
+    </div>
+    <div class="info-card">
+      <h4>🛂 Autorisation</h4>
+      <p style="font-size:13px;color:var(--text-mid);">Répondre à la question <strong style="color:#fff">"Qu'as-tu le droit de faire ?"</strong>. Distinct de l'authentification : on peut être identifié mais n'avoir accès qu'à certains endpoints. Ici : plans demo/cabinet/admin avec des limites différentes.</p>
+    </div>
+    <div class="info-card">
+      <h4>🪙 Token</h4>
+      <p style="font-size:13px;color:var(--text-mid);">Un <strong style="color:#fff">jeton numérique</strong> — une longue chaîne de caractères qui prouve l'identité. Analogie : le ticket de vestiaire d'un restaurant. Tu le présentes à chaque requête au lieu de re-saisir ton mot de passe à chaque fois.</p>
+    </div>
+    <div class="info-card">
+      <h4>📋 JWT — JSON Web Token</h4>
+      <p style="font-size:13px;color:var(--text-mid);">Un type de token <strong style="color:#fff">signé cryptographiquement</strong>. Il contient des informations (qui tu es, quand il expire, ton plan) + une signature qui prouve qu'il est authentique. Personne ne peut le falsifier sans la clé secrète du serveur.</p>
+    </div>
+    <div class="info-card">
+      <h4>🔑 API Key</h4>
+      <p style="font-size:13px;color:var(--text-mid);">Une <strong style="color:#fff">clé secrète statique</strong> — une longue chaîne aléatoire partagée entre deux systèmes. Plus simple que le JWT mais moins flexible. Idéal pour les intégrations machine-à-machine où un humain ne se connecte pas.</p>
+    </div>
+    <div class="info-card">
+      <h4>⏱ Rate Limiting</h4>
+      <p style="font-size:13px;color:var(--text-mid);"><strong style="color:#fff">Limiter le nombre de requêtes</strong> dans un intervalle de temps. Analogie : le portique d'un musée. Tu as un billet valide (token), mais tu ne peux pas rentrer et sortir 50 fois par heure. Protège contre les abus et les erreurs de code.</p>
+    </div>
+  </div>
+
+  <div class="callout info" style="margin-top:8px;">
+    <div class="callout-title">Analogie globale — Le système de badge d'une entreprise</div>
+    <p>Imagine l'API comme un immeuble de bureaux. <strong style="color:#fff">Sans badge</strong> = tu ne peux pas entrer (HTTP 401). <strong style="color:#fff">Badge valide</strong> = tu peux entrer, mais le badge enregistre ton passage. <strong style="color:#fff">Trop d'entrées/sorties en 1 minute</strong> = le portique se bloque temporairement (HTTP 429). <strong style="color:#fff">Badge expiré</strong> = retourne à l'accueil en chercher un nouveau. Le badge contient ton nom, ton service, et sa date d'expiration — c'est exactement ce qu'un JWT contient.</p>
+  </div>
+
+  <!-- JWT EN DÉTAIL -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Comment fonctionne le JWT — Anatomie d'un token</h3>
+
+  <p style="color:var(--text-mid);margin-bottom:16px;">Un JWT ressemble à ça — c'est une longue chaîne de caractères en apparence incompréhensible :</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">Exemple de JWT — les 3 parties séparées par des points</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-comment"># Un JWT = 3 parties encodées en base64, séparées par des points</span>
+<span class="c-keyword">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9</span>   <span class="c-comment">← PARTIE 1 : En-tête (Header)</span>
+<span class="c-string">.eyJzdWIiOiJkZW1vQGNhYmluZXQuZnIiLCJwbGFuIjoiY2FiaW5ldCIsImV4cCI6MTcxMH0</span>  <span class="c-comment">← PARTIE 2 : Données (Payload)</span>
+<span class="c-ok">.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c</span>  <span class="c-comment">← PARTIE 3 : Signature</span>
+
+<span class="c-comment"># Décodé, la Partie 2 (Payload) contient :</span>
+{
+  <span class="c-string">"sub"</span>:      <span class="c-string">"demo@cabinet.fr"</span>,  <span class="c-comment">← qui tu es (subject)</span>
+  <span class="c-string">"plan"</span>:     <span class="c-string">"cabinet"</span>,          <span class="c-comment">← ton plan tarifaire</span>
+  <span class="c-string">"client"</span>:   <span class="c-string">"Cabinet Demo"</span>,     <span class="c-comment">← ton nom lisible</span>
+  <span class="c-string">"is_admin"</span>: <span class="c-flag">false</span>,              <span class="c-comment">← es-tu admin ?</span>
+  <span class="c-string">"exp"</span>:      <span class="c-flag">1710000000</span>,         <span class="c-comment">← quand il expire (timestamp Unix)</span>
+  <span class="c-string">"iat"</span>:      <span class="c-flag">1709996400</span>          <span class="c-comment">← quand il a été créé (issued at)</span>
+}</pre>
+  </div>
+
+  <p style="color:var(--text-mid);margin-bottom:16px;">La <strong style="color:#fff">Partie 3 (signature)</strong> est ce qui rend le JWT infalsifiable. Elle est calculée à partir des parties 1 et 2 + une clé secrète que seul le serveur connaît. Si quelqu'un modifie le payload (ex: change "plan": "demo" en "plan": "admin"), la signature ne correspond plus → le serveur détecte la fraude et refuse le token.</p>
+
+  <div class="two-col">
+    <div class="callout warning">
+      <div class="callout-title">HS256 — L'algorithme de signature</div>
+      <p>HS256 = HMAC-SHA256. C'est la formule mathématique qui crée la signature. Elle prend le contenu du token + la clé secrète → produit une empreinte unique. La même formule avec la même clé produit toujours la même empreinte — c'est comme un sceau de cire qui ne peut être reproduit qu'avec le bon cachet.</p>
+    </div>
+    <div class="callout warning">
+      <div class="callout-title">Stateless — Pourquoi le serveur ne stocke rien</div>
+      <p>Contrairement à une session classique (qui exige une base de données pour stocker l'état), le JWT est <strong>stateless</strong> : toutes les infos sont dans le token lui-même. Le serveur vérifie juste la signature — pas besoin de base de données. C'est plus rapide et plus scalable.</p>
+    </div>
+  </div>
+
+  <!-- FLUX COMPLET -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Flux d'une requête authentifiée — Étape par étape</h3>
+
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="flow-step-num">1</div>
+      <div class="flow-step-content">
+        <h4>Client demande un token — POST /auth/token</h4>
+        <p>L'utilisateur envoie son email + mot de passe une seule fois. Le serveur vérifie les credentials et génère un JWT signé valable 60 minutes. Le client reçoit le token et le conserve — il ne renvoie plus jamais le mot de passe.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">2</div>
+      <div class="flow-step-content">
+        <h4>Client utilise le token sur chaque requête</h4>
+        <p>Le token est envoyé dans le header HTTP <code>Authorization: Bearer eyJ...</code>. C'est une convention standard — le mot "Bearer" signifie littéralement "porteur du token". Le serveur lit ce header automatiquement.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">3</div>
+      <div class="flow-step-content">
+        <h4>Serveur vérifie la signature</h4>
+        <p>FastAPI appelle <code>get_current_user()</code> avant même d'exécuter <code>search()</code>. Cette fonction décode le JWT, recalcule la signature avec la clé secrète, et vérifie qu'elle correspond. Si le token a été modifié ou est expiré → HTTP 401, la requête n'atteint jamais le pipeline RAG.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">4</div>
+      <div class="flow-step-content">
+        <h4>Rate limiting — vérification de la fréquence</h4>
+        <p>Après validation du token, le système vérifie combien de requêtes ce client a envoyé dans la dernière minute. Si la limite est dépassée → HTTP 429 avec un header <code>Retry-After: 42</code> qui indique dans combien de secondes réessayer. Si OK → la requête passe au pipeline RAG.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">5</div>
+      <div class="flow-step-content">
+        <h4>Pipeline RAG exécuté normalement</h4>
+        <p>L'identité du client (<code>current_user.client</code>, <code>current_user.plan</code>) est disponible dans l'endpoint pour enrichir les logs. Le reste du pipeline est identique : injection defense → query expansion → FAISS → reranking → Claude → guardrail.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CODE ENDPOINTS -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Endpoints disponibles</h3>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">curl — Guide de test complet</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-comment"># 1. Obtenir un token de démo (sans credentials — dev only)</span>
+<span class="c-cmd">curl -X POST http://localhost:8000/auth/token/demo</span>
+<span class="c-comment"># → {"access_token": "eyJ...", "token_type": "bearer", "expires_in": 3600}</span>
+
+<span class="c-comment"># 2. Obtenir un token avec credentials (email + mot de passe)</span>
+<span class="c-cmd">curl -X POST http://localhost:8000/auth/token   -H "Content-Type: application/json"   -d '{"email": "demo@cabinet.fr", "password": "demo1234"}'</span>
+
+<span class="c-comment"># 3. Utiliser le token sur /search</span>
+<span class="c-cmd">curl -X POST http://localhost:8000/api/v1/search   -H "Authorization: Bearer eyJ..."   -H "Content-Type: application/json"   -d '{"question": "What are GDPR controller obligations?", "k": 5}'</span>
+
+<span class="c-comment"># 4. Vérifier son token (debug)</span>
+<span class="c-cmd">curl http://localhost:8000/auth/me   -H "Authorization: Bearer eyJ..."</span>
+<span class="c-comment"># → {"sub": "demo@cabinet.fr", "plan": "demo", "rate_limit_max_requests": 10, ...}</span>
+
+<span class="c-comment"># 5. Utiliser une API key (alternative au JWT — pour M2M)</span>
+<span class="c-cmd">curl -X POST http://localhost:8000/api/v1/search   -H "X-API-Key: ma_cle_secrete"   -H "Content-Type: application/json"   -d '{"question": "What are GDPR controller obligations?", "k": 5}'</span></pre>
+  </div>
+
+  <!-- RATE LIMITING DÉTAIL -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Rate Limiting — Comment ça marche concrètement</h3>
+
+  <p style="color:var(--text-mid);margin-bottom:16px;">On utilise une <strong style="color:#fff">fenêtre glissante</strong> — un concept légèrement plus subtil qu'une limite fixe. Voici la différence :</p>
+
+  <div class="two-col">
+    <div class="info-card">
+      <h4 style="color:var(--red)">❌ Fenêtre fixe (problématique)</h4>
+      <p style="font-size:13px;color:var(--text-mid);">Compteur remis à zéro toutes les 60 secondes. Un attaquant peut envoyer 30 requêtes à 00:59 et 30 requêtes à 01:01 → <strong style="color:var(--red)">60 requêtes en 2 secondes</strong> sans déclencher la limite. C'est le "burst at boundary".</p>
+    </div>
+    <div class="info-card">
+      <h4 style="color:var(--green)">✓ Fenêtre glissante (notre implémentation)</h4>
+      <p style="font-size:13px;color:var(--text-mid);">On regarde les <strong style="color:#fff">60 dernières secondes</strong> à chaque requête, peu importe quand. Si 30 requêtes ont été envoyées dans les 60 dernières secondes → bloqué. Pas de burst possible. Plus robuste.</p>
+    </div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">api/auth.py — Algorithme fenêtre glissante (simplifié)</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-comment"># On stocke les timestamps (horodatages) des requêtes passées</span>
+timestamps = [14:32:01, 14:32:15, 14:32:44, ...]  <span class="c-comment">← liste des heures d'appel</span>
+
+<span class="c-comment"># À chaque nouvelle requête :</span>
+<span class="c-flag">1.</span> Supprimer les timestamps plus vieux que 60 secondes
+<span class="c-flag">2.</span> Compter ce qui reste
+<span class="c-flag">3.</span> <span class="c-flag">Si</span> count >= limite → HTTP 429 + Retry-After
+<span class="c-flag">4.</span> <span class="c-flag">Sinon</span> → ajouter le timestamp courant + laisser passer
+
+<span class="c-comment"># Exemple avec plan "demo" (10 req/min) :</span>
+<span class="c-ok">Req 1-10  → OK, timestamps enregistrés</span>
+<span class="c-err">Req 11    → BLOQUÉ — HTTP 429 Retry-After: 42</span>
+<span class="c-ok">60s plus tard → timestamps expirés → Req 11 → OK</span></pre>
+  </div>
+
+  <!-- PLANS ET LIMITES -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Plans et limites configurées</h3>
+
+  <table class="ref-table">
+    <thead><tr><th>Plan</th><th>Limite</th><th>Fenêtre</th><th>Utilisateurs cibles</th><th>Comment obtenir</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>demo</strong></td>
+        <td><span style="color:var(--orange);font-family:var(--mono)">10 req</span></td>
+        <td>60 secondes</td>
+        <td>Démos publiques, tests rapides</td>
+        <td><code>POST /auth/token/demo</code> sans credentials</td>
+      </tr>
+      <tr>
+        <td><strong>cabinet</strong></td>
+        <td><span style="color:var(--green);font-family:var(--mono)">30 req</span></td>
+        <td>60 secondes</td>
+        <td>Clients cabinet — usage normal</td>
+        <td><code>POST /auth/token</code> avec email/password</td>
+      </tr>
+      <tr>
+        <td><strong>admin</strong></td>
+        <td><span style="color:var(--green);font-family:var(--mono)">200 req</span></td>
+        <td>60 secondes</td>
+        <td>Développement, tests de charge</td>
+        <td><code>POST /auth/token</code> avec compte admin</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SÉCURITÉ -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Décisions de sécurité — Ce qu'on a fait et pourquoi</h3>
+
+  <div class="three-col">
+    <div class="info-card">
+      <h4>🔒 Hachage des API keys</h4>
+      <p style="font-size:13px;color:var(--text-mid);">On ne stocke jamais les clés API en clair — uniquement leur <strong style="color:#fff">empreinte SHA-256</strong>. Si la base de données est compromise, l'attaquant ne peut pas retrouver les clés réelles depuis les empreintes (sens unique mathématique).</p>
+    </div>
+    <div class="info-card">
+      <h4>⏱ Comparaison en temps constant</h4>
+      <p style="font-size:13px;color:var(--text-mid);">On utilise <code>hmac.compare_digest()</code> au lieu de <code>==</code>. Pourquoi ? Une comparaison normale s'arrête au premier caractère différent, révélant des infos via le <strong style="color:#fff">timing de la réponse</strong>. Compare_digest prend toujours le même temps.</p>
+    </div>
+    <div class="info-card">
+      <h4>🛡 Protection brute-force</h4>
+      <p style="font-size:13px;color:var(--text-mid);">L'endpoint <code>/auth/token</code> est lui aussi rate-limité à <strong style="color:#fff">5 tentatives/minute par email</strong>. Un attaquant qui essaie des mots de passe en boucle est bloqué rapidement. En production, ajouter aussi un délai exponentiel.</p>
+    </div>
+  </div>
+
+  <!-- CODES HTTP -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Codes HTTP retournés — Ce qu'ils signifient</h3>
+
+  <table class="ref-table">
+    <thead><tr><th>Code</th><th>Nom</th><th>Quand</th><th>Que faire côté client</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span style="color:var(--green);font-family:var(--mono)">200</span></td>
+        <td>OK</td>
+        <td>Token valide, limite non atteinte, réponse générée</td>
+        <td>Utiliser la réponse normalement</td>
+      </tr>
+      <tr>
+        <td><span style="color:var(--orange);font-family:var(--mono)">401</span></td>
+        <td>Unauthorized</td>
+        <td>Token absent, invalide, ou expiré</td>
+        <td>Re-demander un token via <code>/auth/token</code></td>
+      </tr>
+      <tr>
+        <td><span style="color:var(--orange);font-family:var(--mono)">403</span></td>
+        <td>Forbidden</td>
+        <td>Token valide mais droits insuffisants (ex: endpoint admin)</td>
+        <td>Contacter l'administrateur pour changer le plan</td>
+      </tr>
+      <tr>
+        <td><span style="color:var(--red);font-family:var(--mono)">429</span></td>
+        <td>Too Many Requests</td>
+        <td>Limite de fréquence dépassée</td>
+        <td>Attendre X secondes (indiqué dans le header <code>Retry-After</code>)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- LIMITES ET PROCHAINES ÉTAPES -->
+  <div class="callout warning" style="margin-top:24px;">
+    <div class="callout-title">Limites de l'implémentation actuelle — Ce qui manque pour la production</div>
+    <p><strong style="color:#fff">Stockage en mémoire</strong> : les compteurs de rate limiting sont dans la RAM du serveur. Si le serveur redémarre, les compteurs sont remis à zéro. Si plusieurs instances tournent en parallèle (scalabilité), les compteurs ne sont pas partagés. Solution : migrer vers Redis (base de données en mémoire partagée).</p>
+    <p style="margin-top:8px;"><strong style="color:#fff">Mots de passe hardcodés</strong> : les comptes demo/admin sont dans le code. En production : base PostgreSQL avec mots de passe hashés en bcrypt (algorithme de hachage sécurisé pour les mots de passe) ou argon2.</p>
+    <p style="margin-top:8px;"><strong style="color:#fff">Pas de refresh token</strong> : quand le token expire après 60 minutes, l'utilisateur doit se reconnecter. Un refresh token permettrait de renouveler silencieusement sans re-saisir les credentials.</p>
+    <p style="margin-top:8px;"><strong style="color:#fff">HTTPS obligatoire en production</strong> : en HTTP, le token JWT transite en clair dans les headers et peut être intercepté sur le réseau. HTTPS chiffre le transport.</p>
+  </div>
+
+  <!-- ARCHI FICHIERS -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Architecture des fichiers — Ce qui a été créé ou modifié</h3>
+
+  <table class="ref-table">
+    <thead><tr><th>Fichier</th><th>Action</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>api/auth.py</code></td>
+        <td><span class="badge green">Nouveau</span></td>
+        <td>Toute la logique : création JWT, validation JWT, validation API key, check_rate_limit(), dépendances FastAPI</td>
+      </tr>
+      <tr>
+        <td><code>api/auth_router.py</code></td>
+        <td><span class="badge green">Nouveau</span></td>
+        <td>Endpoints HTTP : POST /auth/token, GET /auth/me, POST /auth/token/demo</td>
+      </tr>
+      <tr>
+        <td><code>api/main.py</code></td>
+        <td><span class="badge orange">Modifié</span></td>
+        <td>Import + enregistrement du router auth. Avertissement au démarrage si JWT_SECRET_KEY non configurée.</td>
+      </tr>
+      <tr>
+        <td><code>api/search.py</code></td>
+        <td><span class="badge orange">Modifié</span></td>
+        <td>Endpoint /search protégé par <code>Depends(authenticated_and_rate_limited)</code>. 2 lignes modifiées.</td>
+      </tr>
+      <tr>
+        <td><code>.env</code></td>
+        <td><span class="badge orange">Modifié</span></td>
+        <td>JWT_SECRET_KEY (clé aléatoire 64 chars), DEMO_PASSWORD, ADMIN_PASSWORD, DISABLE_DEMO_TOKEN</td>
+      </tr>
+    </tbody>
+  </table>
+
+</section>
+
+
 
 <!-- FOOTER -->
 <div class="footer">
