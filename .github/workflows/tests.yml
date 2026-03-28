@@ -1,0 +1,54 @@
+name: Tests CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Cache pip pour accélérer les runs suivants
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        env:
+          # Clé JWT de test — jamais la vraie
+          JWT_SECRET_KEY: "ci_test_secret_key_not_production"
+          # Désactiver les modèles HuggingFace en CI (pas de GPU, pas de modèles téléchargés)
+          # Les tests unitaires ne chargent pas les singletons — pas besoin des modèles
+          TRANSFORMERS_OFFLINE: "1"
+          # Désactiver le disclaimer pour certains tests (géré dans les tests eux-mêmes)
+          DISABLE_DISCLAIMER: "false"
+        run: |
+          python -m pytest tests/ -v --tb=short --cov=api --cov-report=term-missing
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: .coverage
