@@ -369,11 +369,12 @@ with st.sidebar:
     if st.session_state.api_status:
         h = st.session_state.api_status
         if h.get("status") == "ok":
-            vs = h.get("vector_store", {})
+            n_vec = h.get("n_vectors", "?")
+            n_reg = h.get("n_regulations", "?")
             st.markdown(f'<span class="status-ok">● API connectée</span>', unsafe_allow_html=True)
             st.markdown(f"""
             <div style="font-size:0.75rem; color:#6b7280; margin-top:0.25rem; font-family:'JetBrains Mono',monospace;">
-                {vs.get('n_vectors', '?')} vecteurs · dim {vs.get('dimension', '?')}
+                {n_vec} vecteurs · {n_reg} réglementations
             </div>
             """, unsafe_allow_html=True)
         else:
