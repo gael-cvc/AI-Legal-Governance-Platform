@@ -179,6 +179,7 @@ pre { padding:20px 24px; font-family:var(--mono); font-size:12px; line-height:1.
     <a class="nav-item" href="#auth">Étape 9 — Auth JWT &amp; Rate Limiting</a>
     <a class="nav-item" href="#audit">Étape 10 — Audit Log &amp; Disclaimer</a>
     <a class="nav-item" href="#tests">Étape 11 — Tests &amp; CI/CD</a>
+    <a class="nav-item" href="#frontend">Étape 12 — Frontend Streamlit</a>
   </div>
   <div class="nav-section">
     <div class="nav-section-title">Bilan</div>
@@ -190,7 +191,7 @@ pre { padding:20px 24px; font-family:var(--mono); font-size:12px; line-height:1.
 
 <!-- HERO -->
 <div class="hero">
-  <div class="hero-tag">Documentation Technique · v6.0</div>
+  <div class="hero-tag">Documentation Technique · v7.0</div>
   <h1>AI Legal <span>Governance</span><br>Intelligence Platform</h1>
   <p class="hero-sub">Architecture complète d'un système RAG (Retrieval-Augmented Generation) appliqué au droit européen. Chaque décision technique documentée, justifiée, et mise en perspective selon les contextes d'usage — du prototype au déploiement containerisé.</p>
   <div class="hero-meta">
@@ -1718,6 +1719,7 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
       <tr><td>Audit log</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>JSONL rotatif. request_id, user, sources, guardrail, latence. logs/audit/audit.jsonl</td></tr>
       <tr><td>Disclaimer légal</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>Ajouté en fin de réponse FR/EN. Désactivable via DISABLE_DISCLAIMER=true.</td></tr>
       <tr><td>Tests unitaires</td><td><span style="color:var(--green);font-family:var(--mono)">100/100 ✓</span></td><td>4 fichiers de tests. injection, guardrail, auth, audit. CI GitHub Actions.</td></tr>
+      <tr><td>Frontend</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>Streamlit. Logo Lex AI / Themis. Switch FR/EN. Tooltips, références cliquables, dark mode. Sources avec texte complet.</td></tr>
       <tr><td>Faithfulness</td><td><span style="color:var(--green);font-family:var(--mono)">88.5% ✓</span></td><td>k=5, prompt v1.1. Plafond structurel ~88% identifié.</td></tr>
       <tr><td>Temps total /search (Docker)</td><td><span style="color:var(--gold2);font-family:var(--mono)">~13s</span></td><td>DEVICE=cpu — comparable au local MPS</td></tr>
     </tbody>
@@ -1727,7 +1729,9 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
   <div class="code-block">
     <div class="code-header"><span class="code-label">git log --oneline</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
     <pre><span class="c-hash">latest </span> <span class="c-ok">feat(auth): JWT + API key auth + rate limiting</span>
-<span class="c-hash">latest </span> <span class="c-ok">feat(tests): unit tests + GitHub Actions CI — 100/100 PASSED</span>
+<span class="c-hash">latest </span> <span class="c-ok">feat(frontend): tooltips, refs cliquables, disclaimer, retour haut</span>
+<span class="c-hash">a1b2c3d</span> feat(frontend): Lex AI UI — logo, switch FR/EN, filtres, historique
+<span class="c-hash">e4f5a6b</span> feat(tests): unit tests + GitHub Actions CI — 100/100 PASSED
 <span class="c-hash">e3f1a2b</span> fix(ci): install only lightweight deps — skip faiss/sentence-transformers
 <span class="c-hash">d4b2c1e</span> feat(disclaimer): legal disclaimer auto en fin de reponse FR/EN
 <span class="c-hash">a5c3d2f</span> feat(audit): JSONL audit log + question par defaut Swagger
@@ -1750,7 +1754,7 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
 
   <div class="callout info" style="margin-top:32px;">
     <div class="callout-title">Roadmap Pro — Document séparé</div>
-    <p>Le plan de développement vers un déploiement professionnel est documenté dans le fichier <code>roadmap.html</code>. Auth JWT ✓ · Rate limiting ✓ · Hallucination guardrail ✓ · Faithfulness 88.5% ✓ · Audit log ✓ · Disclaimer légal ✓ · Tests unitaires 100/100 ✓ · CI GitHub Actions ✓ — Prochaine étape : Frontend (Next.js ou Streamlit).</p>
+    <p>Le plan de développement vers un déploiement professionnel est documenté dans le fichier <code>roadmap.html</code>. Auth JWT ✓ · Audit log ✓ · Disclaimer ✓ · Tests 100/100 ✓ · CI ✓ · Frontend Streamlit ✓ — Prochaines étapes : corpus update pipeline, Redis, PostgreSQL, Cloud Run.</p>
   </div>
 </section>
 
@@ -2448,6 +2452,173 @@ timestamps = [14:32:01, 14:32:15, 14:32:44, ...]  <span class="c-comment">← li
       <tr><td><code>.github/workflows/tests.yml</code></td><td>Workflow GitHub Actions — CI automatique à chaque push</td></tr>
     </tbody>
   </table>
+
+</section>
+
+
+
+<!-- SECTION — FRONTEND STREAMLIT -->
+<section class="section" id="frontend">
+  <div class="section-header">
+    <div class="section-number">12</div>
+    <div class="section-title-block">
+      <h2>Étape 12 — Frontend Streamlit : Lex AI</h2>
+      <p>Interface utilisateur · Streamlit · Switch FR/EN · Tooltips · Sources cliquables · Logo Themis</p>
+    </div>
+  </div>
+
+  <!-- POURQUOI STREAMLIT -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:0 0 16px;">Pourquoi Streamlit — Choix du framework</h3>
+
+  <div class="two-col">
+    <div class="info-card">
+      <h4>🐍 Streamlit</h4>
+      <p style="font-size:13px;color:var(--text-mid);">Framework Python qui transforme un script en application web interactive sans écrire une ligne de HTML/CSS/JavaScript. <strong style="color:#fff">100% Python</strong>, démarrage en 5 minutes, idéal pour prototyper une interface professionnelle rapidement.</p>
+    </div>
+    <div class="info-card">
+      <h4>⚡ Avantages pour ce projet</h4>
+      <p style="font-size:13px;color:var(--text-mid);">Même stack Python que l'API, rechargement automatique à chaque modification, composants prêts à l'emploi (sliders, toggles, expanders). Pas besoin de déployer un serveur Node.js séparé pour le MVP.</p>
+    </div>
+  </div>
+
+  <!-- LANCER -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Lancer le frontend</h3>
+
+  <div class="code-block">
+    <div class="code-header"><span class="code-label">bash — Démarrage (2 terminaux)</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-comment"># Terminal 1 — API FastAPI</span>
+<span class="c-cmd">TRANSFORMERS_OFFLINE=1 venv/bin/python -m uvicorn api.main:app --reload --port 8000</span>
+
+<span class="c-comment"># Terminal 2 — Frontend Streamlit</span>
+<span class="c-cmd">venv/bin/streamlit run frontend/app.py</span>
+
+<span class="c-comment"># Ouvrir dans le navigateur</span>
+<span class="c-ok">http://localhost:8501</span></pre>
+  </div>
+
+  <!-- GLOSSAIRE -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Glossaire — Termes clés</h3>
+
+  <div class="two-col">
+    <div class="info-card">
+      <h4>🗂 Session State</h4>
+      <p style="font-size:13px;color:var(--text-mid);">Streamlit re-exécute tout le script à chaque interaction. <code>st.session_state</code> permet de <strong style="color:#fff">persister des données</strong> entre les re-exécutions — le token JWT, l'historique des requêtes, la langue sélectionnée.</p>
+    </div>
+    <div class="info-card">
+      <h4>🔑 JWT dans le frontend</h4>
+      <p style="font-size:13px;color:var(--text-mid);">L'interface obtient automatiquement un token demo via <code>POST /auth/token/demo</code> au premier appel. Ce token est stocké dans <code>session_state</code> et envoyé dans le header <code>Authorization: Bearer</code> à chaque requête.</p>
+    </div>
+    <div class="info-card">
+      <h4>🌐 i18n FR/EN</h4>
+      <p style="font-size:13px;color:var(--text-mid);"><strong style="color:#fff">Internationalisation</strong> — adaptation de l'interface à la langue choisie. Deux boutons FR/EN en haut à droite basculent tous les labels : sidebar, placeholder, bouton recherche, titres de sections.</p>
+    </div>
+    <div class="info-card">
+      <h4>🔤 base64</h4>
+      <p style="font-size:13px;color:var(--text-mid);">Encodage qui convertit une image binaire en texte ASCII. Utilisé pour injecter le logo directement dans le HTML sans passer par un serveur de fichiers — évite le flou du redimensionnement Streamlit.</p>
+    </div>
+  </div>
+
+  <!-- ARCHITECTURE FRONTEND -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Architecture de l'interface — Ce que voit l'utilisateur</h3>
+
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="flow-step-num">1</div>
+      <div class="flow-step-content">
+        <h4>Sidebar — Navigation permanente</h4>
+        <p>Logo Lex AI / Themis (120px, fond transparent, encodé en base64). Titre "Lex AI" + tagline "Your AI Legal Companion". Statut API avec nombre de vecteurs. Filtres : réglementation, langue de réponse, k (slider 3-10), reranking toggle. Switch FR/EN. Historique des 10 dernières requêtes cliquables.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">2</div>
+      <div class="flow-step-content">
+        <h4>Header — Identification du corpus</h4>
+        <p>Titre "Recherche sur le corpus du droit européen" en Playfair Display. Cinq pills arrondies : GDPR, EU AI Act, DGA, EDPB, CNIL — chacune avec un tooltip CSS custom (fond noir, texte blanc, flèche) qui décrit synthétiquement la réglementation au survol.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">3</div>
+      <div class="flow-step-content">
+        <h4>Zone de recherche — Instructions + champ + bouton</h4>
+        <p>Bloc "Instructions" sobre au-dessus du champ — texte de contexte avec bordure gauche fine. Champ de saisie avec placeholder bilingue. Bouton "🔎 Rechercher" à droite. Expander "Questions suggérées" avec exemples pré-remplis cliquables.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">4</div>
+      <div class="flow-step-content">
+        <h4>Réponse — Texte généré avec citations interactives</h4>
+        <p>Métriques rapides (latence, sources, modèle, query expansion). Texte Markdown converti en HTML (##, **). Badges [SOURCE X] en vert avec tooltip au survol — titre officiel, réglementation, année, page. Disclaimer légal propre en bas.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">5</div>
+      <div class="flow-step-content">
+        <h4>Sources — Références cliquables et texte complet</h4>
+        <p>Expander "Références citées" — liste cliquable avec scroll smooth + highlight teal vers la source correspondante. Cartes sources avec scores FAISS / Rerank, tooltip au survol (fond noir), aperçu 200 chars. Expander "Lire le texte complet" pour chaque source.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FONCTIONNALITÉS TECHNIQUES -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Fonctionnalités techniques notables</h3>
+
+  <table class="ref-table">
+    <thead><tr><th>Fonctionnalité</th><th>Implémentation</th><th>Pourquoi</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Tooltips CSS custom</td>
+        <td><code>::after</code> + <code>attr(data-tip)</code></td>
+        <td>Le tooltip natif HTML (<code>title=</code>) est gris et non stylisable. Le CSS custom donne fond noir, flèche, typographie maîtrisée.</td>
+      </tr>
+      <tr>
+        <td>Logo sans flou</td>
+        <td>Encodage base64 inline dans le HTML</td>
+        <td><code>st.image()</code> redimensionne l'image via Streamlit et crée du flou. L'injection base64 bypasse ce traitement.</td>
+      </tr>
+      <tr>
+        <td>Sidebar toujours visible</td>
+        <td>CSS <code>[data-testid="collapsedControl"] { display: none }</code></td>
+        <td>Streamlit mémorise l'état "fermé" dans localStorage. Masquer le bouton empêche l'utilisateur de fermer la sidebar accidentellement.</td>
+      </tr>
+      <tr>
+        <td>Références cliquables → Sources</td>
+        <td>Ancres HTML + <code>scrollIntoView()</code> JavaScript</td>
+        <td>Chaque carte source a un <code>id="source-card-{i}"</code>. Le clic dans "Références citées" scrolle et surligne temporairement en teal.</td>
+      </tr>
+      <tr>
+        <td>Markdown dans la réponse</td>
+        <td>Regex Python → HTML (<code>##</code>, <code>**</code>, <code>*</code>)</td>
+        <td>La réponse Claude est injectée dans un <code>&lt;div&gt;</code> HTML custom — Streamlit ne parse pas le Markdown dedans. Conversion manuelle nécessaire.</td>
+      </tr>
+      <tr>
+        <td>Bouton retour en haut</td>
+        <td><code>st.components.v1.html()</code> avec <code>window.parent</code></td>
+        <td>Streamlit tourne dans un iframe. <code>window.scrollTo()</code> ne scroll que l'iframe. <code>st.components.v1.html()</code> a accès à <code>window.parent</code> pour scroller la vraie page.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- STRUCTURE FICHIERS -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Fichiers créés</h3>
+
+  <table class="ref-table">
+    <thead><tr><th>Fichier</th><th>Rôle</th></tr></thead>
+    <tbody>
+      <tr><td><code>frontend/app.py</code></td><td>Application Streamlit complète — 900+ lignes</td></tr>
+      <tr><td><code>frontend/lexai_notext.png</code></td><td>Logo Themis sans texte — sidebar (fond transparent, 120px)</td></tr>
+      <tr><td><code>frontend/lexai_logo.png</code></td><td>Logo Themis avec texte "Lex AI" — version complète</td></tr>
+      <tr><td><code>frontend/.streamlit/config.toml</code></td><td>Thème Streamlit — primaryColor teal #2a9d8f, fond blanc</td></tr>
+    </tbody>
+  </table>
+
+  <!-- LIMITES STREAMLIT -->
+  <div class="callout warning" style="margin-top:24px;">
+    <div class="callout-title">Limites connues de Streamlit — À garder en tête</div>
+    <p><strong style="color:#fff">Re-exécution complète à chaque interaction</strong> : Streamlit relance tout le script Python à chaque clic. Pour les éléments lourds (requêtes API), il faut gérer l'état explicitement via <code>session_state</code>.</p>
+    <p style="margin-top:8px;"><strong style="color:#fff">CSS limité</strong> : Streamlit injecte ses propres styles après les CSS custom — certains éléments (boutons notamment) sont difficiles à styler de manière fiable. Les styles sur les composants natifs Streamlit nécessitent des sélecteurs très spécifiques ou du JavaScript.</p>
+    <p style="margin-top:8px;"><strong style="color:#fff">iframe</strong> : Les composants HTML (<code>st.markdown()</code>) tournent dans un iframe isolé. Le JavaScript ne peut pas directement accéder à la page parente sans passer par <code>st.components.v1.html()</code>.</p>
+    <p style="margin-top:8px;"><strong style="color:#fff">localStorage</strong> : Streamlit stocke l'état de la sidebar dans le localStorage du navigateur. En cas de bug d'affichage, vider le localStorage (<code>localStorage.clear()</code> dans la console) restaure l'état initial.</p>
+  </div>
 
 </section>
 

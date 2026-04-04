@@ -31,8 +31,9 @@ A general-purpose LLM knows the GDPR — but you cannot audit its answers. It co
 | Unit tests — 100/100 PASSED | ✅ |
 | CI/CD — GitHub Actions (Python 3.12, pytest) | ✅ |
 | Docker containerization (MPS local / CPU cloud) | ✅ |
-| Bilingual responses (FR / EN) | ✅ |
-| Frontend (Next.js / Streamlit) | 📋 Roadmap |
+| **Frontend Streamlit — Lex AI** | ✅ |
+| Bilingual interface (FR / EN) | ✅ |
+| Corpus update pipeline (incremental FAISS.add()) | 📋 Roadmap |
 
 ---
 
@@ -83,16 +84,38 @@ Question
 [7] Legal Disclaimer             — appended to response (FR/EN), outside faithfulness scope
     │
     ▼
-Structured JSON response
+Structured JSON response → Streamlit Frontend
 ```
+
+---
+
+## Frontend — Lex AI
+
+```bash
+# Install
+venv/bin/pip install streamlit
+
+# Run (requires API on port 8000)
+venv/bin/streamlit run frontend/app.py
+# → http://localhost:8501
+```
+
+### Features
+- **Logo Lex AI / Themis** — sidebar, transparent background, base64 encoded (no blur)
+- **Switch FR/EN** — full i18n: labels, placeholders, section titles
+- **Corpus pills** with hover tooltips (GDPR, EU AI Act, DGA, EDPB, CNIL)
+- **[SOURCE X] badges** in green with hover tooltip (title, regulation, year, page)
+- **Clickable references** — scroll + teal highlight to corresponding source card
+- **Source cards** with FAISS/Rerank scores, 200-char preview, full text expander
+- **Legal disclaimer** — clean, no markdown artifacts
+- **Back to top button** — fixed bottom-right, uses `st.components.v1.html()` for iframe access
+- **Theme** — white professional, Playfair Display + Source Sans 3, teal `#2a9d8f` primary
 
 ---
 
 ## Authentication
 
-Every request to `/search` must be authenticated. The API supports **JWT Bearer tokens** and **API keys**.
-
-### Get a token
+Every request to `/search` must be authenticated.
 
 ```bash
 # Demo token (no credentials — dev only)
@@ -102,101 +125,47 @@ curl -X POST http://localhost:8000/auth/token/demo
 curl -X POST http://localhost:8000/auth/token \
   -H "Content-Type: application/json" \
   -d '{"email": "demo@cabinet.fr", "password": "demo1234"}'
-```
 
-### Use the token
-
-```bash
+# Use the token
 curl -X POST http://localhost:8000/api/v1/search \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9..." \
+  -H "Authorization: Bearer eyJ..." \
   -H "Content-Type: application/json" \
   -d '{"question": "What are the obligations of a data controller under GDPR?", "k": 5}'
 ```
 
-### Rate limits by plan
+### Rate limits
 
-| Plan | Limit | Window | How to get |
-|---|---|---|---|
-| `demo` | 10 req | 60s | `/auth/token/demo` |
-| `cabinet` | 30 req | 60s | `/auth/token` with credentials |
-| `admin` | 200 req | 60s | `/auth/token` with admin account |
-
----
-
-## Audit Log
-
-Every successful `/search` request writes one JSON line to `logs/audit/audit.jsonl`:
-
-```json
-{
-  "timestamp": "2026-03-28T14:32:01.123Z",
-  "request_id": "550e8400-e29b-41d4-a716-446655440000",
-  "user_sub": "demo@cabinet.fr",
-  "user_plan": "cabinet",
-  "question": "What are GDPR controller obligations?",
-  "sources_used": ["Article 24", "Recital 74", "Article 5"],
-  "guardrail_severity": "ok",
-  "latency_ms": 3420.5,
-  "status": "success"
-}
-```
-
-- Rotating file handler: 10 MB x 5 files = 50 MB max
-- Retention: 180 days (configurable via `AUDIT_RETENTION_DAYS`)
-- `logs/` is in `.gitignore` — never versioned
-
----
-
-## Legal Disclaimer
-
-Automatically appended to every response (FR/EN):
-
-```
----
-⚖️ Ce système est un outil d'aide à la recherche documentaire juridique.
-Les informations fournies ne constituent pas un conseil juridique.
-Pour toute décision juridique, consultez un avocat qualifié.
-```
-
-Disable for evaluation runs: `DISABLE_DISCLAIMER=true` in `.env`.
+| Plan | Limit | Window |
+|---|---|---|
+| `demo` | 10 req | 60s |
+| `cabinet` | 30 req | 60s |
+| `admin` | 200 req | 60s |
 
 ---
 
 ## Tests
 
 ```bash
-# Install
 venv/bin/pip install pytest pytest-cov
-
-# Run all tests
 venv/bin/python -m pytest tests/ -v
 ```
 
 ```
-collected 100 items
-
-tests/test_audit_disclaimer.py  27 passed
-tests/test_auth.py              22 passed
-tests/test_guardrail.py         22 passed
-tests/test_injection.py         24 passed
-
-========================= 100 passed in 2.14s =========================
+collected 100 items — 100 passed in 2.14s
 ```
 
 | File | Tests | Covers |
 |---|---|---|
-| `test_injection.py` | 24 | `detect_prompt_injection()` — legit questions + known attacks |
-| `test_guardrail.py` | 22 | `check_hallucination_guardrail()` — OK / LOW / HIGH thresholds |
-| `test_auth.py` | 22 | JWT create/decode, API key hash, rate limiting sliding window |
-| `test_audit_disclaimer.py` | 27 | JSONL validity, UUID format, disclaimer FR/EN content |
+| `test_injection.py` | 24 | `detect_prompt_injection()` |
+| `test_guardrail.py` | 22 | `check_hallucination_guardrail()` |
+| `test_auth.py` | 22 | JWT, API keys, rate limiting |
+| `test_audit_disclaimer.py` | 27 | Audit log JSONL, disclaimer FR/EN |
 
-CI runs automatically on every push to `main` via GitHub Actions.
+CI runs on every push to `main` via GitHub Actions.
 
 ---
 
 ## Quick Start
-
-### Local (Mac M4 / MPS)
 
 ```bash
 git clone https://github.com/gael-cvc/AI-Legal-Governance-Platform
@@ -205,25 +174,17 @@ python3.12 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# Edit .env:
 # ANTHROPIC_API_KEY=sk-ant-...
 # JWT_SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 
-TRANSFORMERS_OFFLINE=1 venv/bin/python -m uvicorn api.main:app --reload --port 8000
-```
-
-### Docker (CPU)
-
-```bash
-cp .env.example .env  # add ANTHROPIC_API_KEY and JWT_SECRET_KEY
-docker compose up --build
-```
-
-### Build the index (required on first run)
-
-```bash
+# Build index (first run)
 venv/bin/python -m rag.build_index
-# Expected: 2016 vectors · 384D · IndexFlatIP
+
+# Terminal 1 — API
+TRANSFORMERS_OFFLINE=1 venv/bin/python -m uvicorn api.main:app --reload --port 8000
+
+# Terminal 2 — Frontend
+venv/bin/streamlit run frontend/app.py
 ```
 
 ---
@@ -231,24 +192,15 @@ venv/bin/python -m rag.build_index
 ## Environment Variables
 
 ```bash
-# Required
 ANTHROPIC_API_KEY=sk-ant-...
-
-# Auth
-JWT_SECRET_KEY=your_generated_secret_here
+JWT_SECRET_KEY=your_generated_secret
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 DEMO_PASSWORD=demo1234
-ADMIN_PASSWORD=your_secure_admin_password
+ADMIN_PASSWORD=your_secure_password
 DISABLE_DEMO_TOKEN=false
-
-# Disclaimer
 DISABLE_DISCLAIMER=false
-
-# Audit log
 AUDIT_LOG_DIR=logs/audit
 AUDIT_RETENTION_DAYS=180
-
-# Device
 DEVICE=mps
 TRANSFORMERS_OFFLINE=1
 ```
@@ -262,32 +214,31 @@ TRANSFORMERS_OFFLINE=1
 ├── api/
 │   ├── main.py           # FastAPI app, lifespan, singletons
 │   ├── auth.py           # JWT, API keys, rate limiting
-│   ├── auth_router.py    # /auth/token, /auth/me endpoints
+│   ├── auth_router.py    # /auth/token, /auth/me
 │   ├── audit_log.py      # JSONL audit logging
 │   ├── search.py         # RAG pipeline, guardrails, disclaimer
 │   └── models.py         # Pydantic schemas
+├── frontend/
+│   ├── app.py            # Streamlit UI — Lex AI
+│   ├── lexai_notext.png  # Logo sidebar
+│   ├── lexai_logo.png    # Logo complet
+│   └── .streamlit/
+│       └── config.toml   # Theme teal
 ├── rag/
-│   ├── build_index.py    # FAISS index construction
-│   ├── vector_store.py   # FAISS search + metadata filters
-│   └── embedder.py       # LegalEmbedder singleton
+│   ├── build_index.py
+│   ├── vector_store.py
+│   └── embedder.py
 ├── evaluation/
-│   ├── evaluator.py      # recall@k + faithfulness LLM-as-judge
-│   └── eval_dataset.py   # 19 EvalCase definitions
+│   ├── evaluator.py
+│   └── eval_dataset.py
 ├── tests/
 │   ├── conftest.py
 │   ├── test_injection.py
 │   ├── test_guardrail.py
 │   ├── test_auth.py
 │   └── test_audit_disclaimer.py
-├── .github/
-│   └── workflows/
-│       └── tests.yml     # CI — Python 3.12, pytest, 100 tests
-├── data/
-│   ├── raw/              # source PDFs (not versioned)
-│   ├── bronze/           # parsed segments
-│   ├── silver/           # final chunks
-│   └── vector_store/     # FAISS index (not versioned)
-├── logs/                 # audit logs (not versioned)
+├── .github/workflows/tests.yml
+├── logs/                 # audit logs (gitignored)
 ├── Dockerfile
 ├── docker-compose.yml
 └── .env.example
@@ -295,39 +246,21 @@ TRANSFORMERS_OFFLINE=1
 
 ---
 
-## Evaluation
-
-### Recall@5 — 100% (internal consistency)
-
-> Dataset calibrated on the existing index. Measures internal consistency. Independent benchmark (lawyer annotation) planned.
-
-### Faithfulness — 88.5% (LLM-as-judge, k=5, prompt v1.1)
-
-| Run | Config | Score | Delta |
-|---|---|---|---|
-| Run 1 | Prompt v1.0 · k=5 | 87.4% | baseline |
-| Run 2 | Prompt v1.1 (FORBIDDEN rule) · k=5 | **88.5%** | +1.1% |
-| Run 3 | Prompt v1.1 · k=7 | 87.4% | -1.1% |
-
-Structural ceiling ~88% — GDPR overrepresentation in Claude training data. k=7 test confirmed.
-
----
-
-## Metrics Summary
+## Metrics
 
 | Metric | Value | Notes |
 |---|---|---|
 | Chunks | 2,016 | silver layer |
-| Vector dimensions | 384 | all-MiniLM-L6-v2 |
 | FAISS latency | < 5ms | exact search |
 | Total /search latency | ~14s | query expansion + Claude |
-| Recall@5 | 100% | internal dataset |
+| Recall@5 | 100% ⚠ | internal dataset |
 | Faithfulness | 88.5% | k=5, prompt v1.1 |
 | Injection patterns | 18 regex | + 3 structural heuristics |
 | Guardrail | Active | LOW/HIGH severity |
 | Auth | JWT + API keys | rate limiting per plan |
 | Audit log | Active | JSONL rotating, 50MB max |
-| Unit tests | 100/100 | 4 files, CI GitHub Actions |
+| Unit tests | 100/100 | CI GitHub Actions |
+| Frontend | Streamlit | Lex AI, FR/EN, tooltips |
 
 ---
 
@@ -339,7 +272,7 @@ Structural ceiling ~88% — GDPR overrepresentation in Claude training data. k=7
 - [x] Audit log JSONL
 - [x] Legal disclaimer (FR/EN)
 - [x] Unit tests (100/100) + CI/CD GitHub Actions
-- [ ] Frontend (Next.js or Streamlit)
+- [x] Frontend Streamlit — Lex AI
 - [ ] Corpus update pipeline (incremental FAISS.add())
 - [ ] Redis for distributed rate limiting
 - [ ] PostgreSQL for user management
