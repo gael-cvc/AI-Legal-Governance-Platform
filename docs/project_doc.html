@@ -18,8 +18,15 @@
   --sans: 'IBM Plex Sans', sans-serif;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
-html { scroll-behavior:smooth; scroll-padding-top:40px; }
-.section { scroll-margin-top:40px; }
+html { scroll-behavior:smooth; scroll-padding-top:80px; }
+/* Force alignment sections 10-11-12 */
+#audit, #tests, #frontend {
+    margin-left: 260px !important;
+    position: relative !important;
+    left: 0 !important;
+}
+
+.section { scroll-margin-top:80px; }
 body { background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.7; overflow-x:hidden; }
 body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E"); pointer-events:none; z-index:1000; opacity:0.4; }
 
@@ -310,7 +317,7 @@ pre { padding:20px 24px; font-family:var(--mono); font-size:12px; line-height:1.
         <div class="callout-title">JSONL vs JSON</div>
         <p>On choisit JSONL (une ligne = un objet) plutôt que JSON array pour trois raisons : lecture ligne par ligne sans charger tout en mémoire, compatibilité Spark/pandas/jq, et append atomique sans réécrire tout le fichier.</p>
       </div>
-    </div>
+    
   </div>
 
   <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Documents sources — Corpus légal EU</h3>
@@ -1371,7 +1378,11 @@ score = len(supported) / len(all_claims)</pre>
     </div>
   </div>
 
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Architecture du pipeline d'évaluation</h3><!-- SECTION — PROMPT INJECTION DEFENSE -->
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Architecture du pipeline d'évaluation</h3>
+
+</section>
+
+<!-- SECTION — PROMPT INJECTION DEFENSE -->
 <section class="section" id="injection">
   <div class="section-header">
     <div class="section-number">07</div>
@@ -1716,11 +1727,12 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
       <tr><td>Injection patterns</td><td><span style="color:var(--green);font-family:var(--mono)">18 regex</span></td><td>+ 3 heuristiques structurelles</td></tr>
       <tr><td>Docker</td><td><span style="color:var(--green);font-family:var(--mono)">Opérationnel ✓</span></td><td>CPU container — claude-sonnet-4-20250514 confirmé</td></tr>
       <tr><td>Auth JWT</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>JWT HS256 + API keys. Plans demo/cabinet/admin. Rate limiting fenêtre glissante.</td></tr>
-      <tr><td>Hallucination guardrail</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>Sources fantômes détectées. LOW : disclaimer. HIGH : HTTP 503.</td></tr>
-      <tr><td>Audit log</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>JSONL rotatif. request_id, user, sources, guardrail, latence. logs/audit/audit.jsonl</td></tr>
+      <tr><td>Audit log</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>JSONL rotatif. request_id, user, sources, guardrail, latence.</td></tr>
       <tr><td>Disclaimer légal</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>Ajouté en fin de réponse FR/EN. Désactivable via DISABLE_DISCLAIMER=true.</td></tr>
-      <tr><td>Tests unitaires</td><td><span style="color:var(--green);font-family:var(--mono)">100/100 ✓</span></td><td>4 fichiers de tests. injection, guardrail, auth, audit. CI GitHub Actions.</td></tr>
-      <tr><td>Frontend</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>Streamlit. Logo Lex AI / Themis. Switch FR/EN. Tooltips, références cliquables, dark mode. Sources avec texte complet.</td></tr>
+      <tr><td>Tests unitaires</td><td><span style="color:var(--green);font-family:var(--mono)">100/100 ✓</span></td><td>4 fichiers. injection, guardrail, auth, audit. CI GitHub Actions.</td></tr>
+      <tr><td>Frontend Streamlit</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>Lex AI · Themis · Switch FR/EN · Filtres · Historique · Tooltips.</td></tr>
+      <tr><td>Auth JWT</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>JWT HS256 + API keys. Plans demo/cabinet/admin. Rate limiting fenêtre glissante.</td></tr>
+      <tr><td>Hallucination guardrail</td><td><span style="color:var(--green);font-family:var(--mono)">Actif ✓</span></td><td>Sources fantômes détectées. LOW : disclaimer. HIGH : HTTP 503.</td></tr>
       <tr><td>Faithfulness</td><td><span style="color:var(--green);font-family:var(--mono)">88.5% ✓</span></td><td>k=5, prompt v1.1. Plafond structurel ~88% identifié.</td></tr>
       <tr><td>Temps total /search (Docker)</td><td><span style="color:var(--gold2);font-family:var(--mono)">~13s</span></td><td>DEVICE=cpu — comparable au local MPS</td></tr>
     </tbody>
@@ -1730,13 +1742,6 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
   <div class="code-block">
     <div class="code-header"><span class="code-label">git log --oneline</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
     <pre><span class="c-hash">latest </span> <span class="c-ok">feat(auth): JWT + API key auth + rate limiting</span>
-<span class="c-hash">latest </span> <span class="c-ok">feat(frontend): tooltips, refs cliquables, disclaimer, retour haut</span>
-<span class="c-hash">a1b2c3d</span> feat(frontend): Lex AI UI — logo, switch FR/EN, filtres, historique
-<span class="c-hash">e4f5a6b</span> feat(tests): unit tests + GitHub Actions CI — 100/100 PASSED
-<span class="c-hash">e3f1a2b</span> fix(ci): install only lightweight deps — skip faiss/sentence-transformers
-<span class="c-hash">d4b2c1e</span> feat(disclaimer): legal disclaimer auto en fin de reponse FR/EN
-<span class="c-hash">a5c3d2f</span> feat(audit): JSONL audit log + question par defaut Swagger
-<span class="c-hash">b6d4e3a</span> feat(auth): JWT + API key auth + rate limiting
 <span class="c-hash">c8f2a1b</span> feat(guardrail): hallucination guardrail — detection sources fantomes
 <span class="c-hash">b3e9f1a</span> perf(prompt): faithfulness 88.5% — patch build_prompt + docs v4.0
 <span class="c-hash">a1c4d7e</span> fix(docker): add anthropic to requirements.txt — LLM fallback résolu
@@ -1755,7 +1760,7 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
 
   <div class="callout info" style="margin-top:32px;">
     <div class="callout-title">Roadmap Pro — Document séparé</div>
-    <p>Le plan de développement vers un déploiement professionnel est documenté dans le fichier <code>roadmap.html</code>. Auth JWT ✓ · Audit log ✓ · Disclaimer ✓ · Tests 100/100 ✓ · CI ✓ · Frontend Streamlit ✓ — Prochaines étapes : corpus update pipeline, Redis, PostgreSQL, Cloud Run.</p>
+    <p>Le plan de développement vers un déploiement professionnel est documenté dans le fichier <code>roadmap.html</code>. Auth JWT ✓ · Rate limiting ✓ · Hallucination guardrail ✓ · Faithfulness 88.5% ✓ — Prochaines étapes : audit log, disclaimer légal, frontend, corpus update pipeline, tests unitaires, monitoring cloud.</p>
   </div>
 </section>
 
@@ -1837,7 +1842,7 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
 
 <span class="c-comment"># Décodé, la Partie 2 (Payload) contient :</span>
 {
-  <span class="c-string">"sub"</span>:      <span class="c-string">"<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="c4a0a1a9ab84a7a5a6adaaa1b0eaa2b6">[email&#160;protected]</a>"</span>,  <span class="c-comment">← qui tu es (subject)</span>
+  <span class="c-string">"sub"</span>:      <span class="c-string">"<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="284c4d4547684b494a41464d5c064e5a">[email&#160;protected]</a>"</span>,  <span class="c-comment">← qui tu es (subject)</span>
   <span class="c-string">"plan"</span>:     <span class="c-string">"cabinet"</span>,          <span class="c-comment">← ton plan tarifaire</span>
   <span class="c-string">"client"</span>:   <span class="c-string">"Cabinet Demo"</span>,     <span class="c-comment">← ton nom lisible</span>
   <span class="c-string">"is_admin"</span>: <span class="c-flag">false</span>,              <span class="c-comment">← es-tu admin ?</span>
@@ -1910,14 +1915,14 @@ model = SentenceTransformer(<span class="c-string">"all-MiniLM-L6-v2"</span>, de
 <span class="c-comment"># → {"access_token": "eyJ...", "token_type": "bearer", "expires_in": 3600}</span>
 
 <span class="c-comment"># 2. Obtenir un token avec credentials (email + mot de passe)</span>
-<span class="c-cmd">curl -X POST http://localhost:8000/auth/token   -H "Content-Type: application/json"   -d '{"email": "<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="492d2c2426092a282b20272c3d672f3b">[email&#160;protected]</a>", "password": "demo1234"}'</span>
+<span class="c-cmd">curl -X POST http://localhost:8000/auth/token   -H "Content-Type: application/json"   -d '{"email": "<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="b8dcddd5d7f8dbd9dad1d6ddcc96deca">[email&#160;protected]</a>", "password": "demo1234"}'</span>
 
 <span class="c-comment"># 3. Utiliser le token sur /search</span>
 <span class="c-cmd">curl -X POST http://localhost:8000/api/v1/search   -H "Authorization: Bearer eyJ..."   -H "Content-Type: application/json"   -d '{"question": "What are GDPR controller obligations?", "k": 5}'</span>
 
 <span class="c-comment"># 4. Vérifier son token (debug)</span>
 <span class="c-cmd">curl http://localhost:8000/auth/me   -H "Authorization: Bearer eyJ..."</span>
-<span class="c-comment"># → {"sub": "<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="442021292b042725262d2a21306a2236">[email&#160;protected]</a>", "plan": "demo", "rate_limit_max_requests": 10, ...}</span>
+<span class="c-comment"># → {"sub": "<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="056160686a456664676c6b60712b6377">[email&#160;protected]</a>", "plan": "demo", "rate_limit_max_requests": 10, ...}</span>
 
 <span class="c-comment"># 5. Utiliser une API key (alternative au JWT — pour M2M)</span>
 <span class="c-cmd">curl -X POST http://localhost:8000/api/v1/search   -H "X-API-Key: ma_cle_secrete"   -H "Content-Type: application/json"   -d '{"question": "What are GDPR controller obligations?", "k": 5}'</span></pre>
@@ -2081,557 +2086,181 @@ timestamps = [14:32:01, 14:32:15, 14:32:44, ...]  <span class="c-comment">← li
   </table>
   </div>
 </section>
-
-
-
-<!-- SECTION — AUDIT LOG + DISCLAIMER -->
+<!-- SECTION 10 — AUDIT LOG + DISCLAIMER -->
 <section class="section" id="audit">
   <div class="section-header">
     <div class="section-number">10</div>
     <div class="section-title-block">
       <h2>Étape 10 — Audit Log JSONL &amp; Disclaimer Légal</h2>
-      <p>Traçabilité · JSONL rotatif · request_id · Déontologie · HTTP 200 enrichi</p>
+      <p>Traçabilité · JSONL rotatif · request_id · Déontologie · RGPD</p>
     </div>
   </div>
 
-  <!-- PARTIE A — AUDIT LOG -->
   <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:0 0 16px;">Partie A — Audit Log JSONL</h3>
 
-  <h3 style="font-family:var(--mono);font-size:13px;color:var(--text-mid);margin:0 0 16px;">Glossaire — Termes à comprendre avant de continuer</h3>
-
   <div class="two-col">
-    <div class="info-card">
-      <h4>📋 Audit Log</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Un <strong style="color:#fff">registre chronologique</strong> de tout ce qui se passe dans le système. Comme le journal de bord d'un capitaine — chaque événement important est noté avec l'heure, qui l'a fait, et ce qui s'est passé. Obligatoire pour prouver la conformité RGPD (Article 5(2) — "accountability").</p>
-    </div>
-    <div class="info-card">
-      <h4>📄 JSONL — JSON Lines</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Un format de fichier où <strong style="color:#fff">chaque ligne est un objet JSON indépendant</strong>. Contrairement à un JSON classique (un grand bloc), JSONL peut être lu ligne par ligne sans charger tout le fichier. Idéal pour les logs qui s'accumulent continuellement.</p>
-    </div>
-    <div class="info-card">
-      <h4>🔄 Rotation de fichiers</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Mécanisme qui <strong style="color:#fff">renomme automatiquement</strong> le fichier de log quand il devient trop grand. Quand <code>audit.jsonl</code> atteint 10 MB, il devient <code>audit.jsonl.1</code>, et un nouveau <code>audit.jsonl</code> commence. On garde 5 fichiers max = 50 MB sur disque.</p>
-    </div>
-    <div class="info-card">
-      <h4>🆔 request_id</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Un <strong style="color:#fff">identifiant unique</strong> généré pour chaque requête (format UUID : <code>550e8400-e29b-41d4-a716-446655440000</code>). Permet de retrouver une requête précise dans les logs. Si un client se plaint, on cherche son request_id et on voit tout ce qui s'est passé.</p>
-    </div>
+    <div class="info-card"><h4>📋 Audit Log</h4><p style="font-size:13px;color:var(--text-mid);">Registre chronologique de tout ce qui se passe dans le système. Obligatoire pour prouver la conformité RGPD Article 5(2) accountability.</p></div>
+    <div class="info-card"><h4>📄 JSONL</h4><p style="font-size:13px;color:var(--text-mid);">Format où chaque ligne est un objet JSON indépendant. Peut être lu ligne par ligne sans charger tout le fichier.</p></div>
+    <div class="info-card"><h4>🔄 Rotation de fichiers</h4><p style="font-size:13px;color:var(--text-mid);">Quand audit.jsonl dépasse 10 MB, il devient audit.jsonl.1. 5 fichiers max = 50 MB sur disque.</p></div>
+    <div class="info-card"><h4>🆔 request_id</h4><p style="font-size:13px;color:var(--text-mid);">Identifiant UUID unique par requête. Format : 550e8400-e29b-41d4-a716-446655440000.</p></div>
   </div>
 
-  <div class="callout info" style="margin-top:8px;">
+  <div class="callout info" style="margin-top:16px;">
     <div class="callout-title">Pourquoi c'est important pour un cabinet</div>
-    <p>Le RGPD Article 5(2) impose la <strong style="color:#fff">responsabilité</strong> (accountability) : le cabinet doit pouvoir prouver que son système traite les données conformément à la loi. L'audit log est cette preuve. Si un client demande "quelle réponse avez-vous donnée le 15 mars à 14h32 ?", on peut retrouver l'entrée exacte avec les sources utilisées, la latence, et le plan tarifaire du client.</p>
+    <p>Le RGPD Article 5(2) impose la responsabilité : le cabinet doit prouver la conformité. Si un client demande "quelle réponse avez-vous donnée le 15 mars à 14h32 ?", on retrouve l'entrée exacte avec sources, latence et guardrail.</p>
   </div>
 
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Ce que contient chaque entrée de log</h3>
-
-  <div class="code-block">
-    <div class="code-header"><span class="code-label">logs/audit/audit.jsonl — Exemple d'une ligne (formatée pour la lisibilité)</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+  <div class="code-block" style="margin-top:24px;">
+    <div class="code-header"><span class="code-label">logs/audit/audit.jsonl — Exemple d'une entrée</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
     <pre>{
-  <span class="c-string">"timestamp"</span>:   <span class="c-ok">"2026-03-28T14:32:01.123Z"</span>,  <span class="c-comment">← quand (UTC)</span>
-  <span class="c-string">"request_id"</span>:  <span class="c-ok">"550e8400-e29b-41d4-a716-446655440000"</span>,  <span class="c-comment">← identifiant unique</span>
-  <span class="c-string">"user_sub"</span>:    <span class="c-ok">"demo@cabinet.fr"</span>,  <span class="c-comment">← qui a demandé</span>
-  <span class="c-string">"user_plan"</span>:   <span class="c-ok">"cabinet"</span>,  <span class="c-comment">← son plan tarifaire</span>
-  <span class="c-string">"question"</span>:    <span class="c-ok">"What are GDPR controller obligations?"</span>,  <span class="c-comment">← tronquée à 500 chars</span>
-  <span class="c-string">"regulation"</span>:  <span class="c-ok">"GDPR"</span>,  <span class="c-comment">← filtre appliqué</span>
-  <span class="c-string">"k"</span>:           <span class="c-ok">5</span>,  <span class="c-comment">← chunks demandés</span>
-  <span class="c-string">"sources_used"</span>: <span class="c-ok">["Article 24", "Recital 74", "Article 5"]</span>,  <span class="c-comment">← sources citées</span>
-  <span class="c-string">"model_used"</span>:  <span class="c-ok">"claude-sonnet-4-20250514"</span>,
-  <span class="c-string">"guardrail_severity"</span>: <span class="c-ok">"ok"</span>,  <span class="c-comment">← ok / low / high</span>
-  <span class="c-string">"latency_ms"</span>:  <span class="c-ok">3420.5</span>,  <span class="c-comment">← temps total de la requête</span>
-  <span class="c-string">"status"</span>:      <span class="c-ok">"success"</span>  <span class="c-comment">← success / error / blocked_injection</span>
+  <span class="c-string">"timestamp"</span>:   <span class="c-ok">"2026-03-28T14:32:01.123Z"</span>,
+  <span class="c-string">"request_id"</span>:  <span class="c-ok">"550e8400-e29b-41d4-a716-..."</span>,
+  <span class="c-string">"user_sub"</span>:    <span class="c-ok">"demo@cabinet.fr"</span>,
+  <span class="c-string">"user_plan"</span>:   <span class="c-ok">"cabinet"</span>,
+  <span class="c-string">"question"</span>:    <span class="c-ok">"What are GDPR controller obligations?"</span>,
+  <span class="c-string">"sources_used"</span>: <span class="c-ok">["Article 24", "Recital 74"]</span>,
+  <span class="c-string">"guardrail_severity"</span>: <span class="c-ok">"ok"</span>,
+  <span class="c-string">"latency_ms"</span>:  <span class="c-ok">3420.5</span>,
+  <span class="c-string">"status"</span>:      <span class="c-ok">"success"</span>
 }</pre>
   </div>
 
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Comment ça s'intègre dans le pipeline</h3>
-
-  <div class="flow-steps">
-    <div class="flow-step">
-      <div class="flow-step-num">1</div>
-      <div class="flow-step-content">
-        <h4>Génération du request_id au début de search()</h4>
-        <p>Dès que la requête arrive dans l'endpoint, avant même l'injection defense, on génère un UUID unique avec <code>generate_request_id()</code>. Ce même identifiant sera dans les logs applicatifs (terminal) ET dans l'audit log — facilitant la corrélation.</p>
-      </div>
-    </div>
-    <div class="flow-step">
-      <div class="flow-step-num">2</div>
-      <div class="flow-step-content">
-        <h4>Pipeline RAG s'exécute normalement</h4>
-        <p>Injection defense → query expansion → FAISS → reranking → Claude → guardrail. Le request_id est transmis dans les logs de chaque étape via le logger applicatif.</p>
-      </div>
-    </div>
-    <div class="flow-step">
-      <div class="flow-step-num">3</div>
-      <div class="flow-step-content">
-        <h4>write_audit_log() appelé après succès</h4>
-        <p>Juste avant le <code>return SearchResponse()</code>, on appelle <code>write_audit_log(build_audit_entry(...))</code>. L'écriture est synchrone mais négligeable (~0.1ms). Si l'écriture échoue (disque plein), la requête n'est PAS interrompue — erreur loggée silencieusement.</p>
-      </div>
-    </div>
-    <div class="flow-step">
-      <div class="flow-step-num">4</div>
-      <div class="flow-step-content">
-        <h4>RotatingFileHandler gère la rotation automatiquement</h4>
-        <p>Le module Python <code>logging</code> est thread-safe et gère la rotation sans intervention. Quand <code>audit.jsonl</code> dépasse 10 MB, il est renommé automatiquement. 5 fichiers de backup = 50 MB max sur disque.</p>
-      </div>
-    </div>
+  <div class="callout warning" style="margin-top:16px;">
+    <div class="callout-title">RGPD — Conservation des logs</div>
+    <p>Conservation 6 mois (AUDIT_RETENTION_DAYS). Le dossier logs/ est dans .gitignore — jamais versionné.</p>
   </div>
 
-  <div class="callout warning">
-    <div class="callout-title">RGPD — La question délicate des logs</div>
-    <p>Les logs contiennent potentiellement des données personnelles (questions posées, identifiants utilisateurs). Obligations légales : durée de conservation limitée (6 mois par défaut, configurable via <code>AUDIT_RETENTION_DAYS</code>), accès restreint au fichier, possibilité de suppression sur demande (droit à l'oubli). Le dossier <code>logs/</code> est dans <code>.gitignore</code> — il ne doit jamais être versionné.</p>
-  </div>
-
-  <!-- PARTIE B — DISCLAIMER -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:40px 0 16px;">Partie B — Disclaimer Légal Automatique</h3>
-
-  <h3 style="font-family:var(--mono);font-size:13px;color:var(--text-mid);margin:0 0 16px;">Glossaire</h3>
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Partie B — Disclaimer Légal Automatique</h3>
 
   <div class="two-col">
-    <div class="info-card">
-      <h4>⚖️ Disclaimer</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Mention légale qui <strong style="color:#fff">limite la responsabilité</strong> et informe l'utilisateur des limites du service. "Ce système est un outil d'aide à la recherche, pas un conseil juridique." Obligatoire pour tout déploiement d'outil juridique selon le RIN (Règlement Intérieur National du barreau).</p>
-    </div>
-    <div class="info-card">
-      <h4>📜 RIN — Règlement Intérieur National</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Texte qui régit la <strong style="color:#fff">déontologie des avocats en France</strong>. Il impose que tout outil d'aide juridique précise clairement qu'il ne remplace pas le conseil d'un avocat qualifié. Sans cette mention, le cabinet qui déploie l'outil engage potentiellement sa responsabilité.</p>
-    </div>
+    <div class="info-card"><h4>⚖️ Disclaimer</h4><p style="font-size:13px;color:var(--text-mid);">"Ce système est un outil d'aide à la recherche, pas un conseil juridique." Obligatoire selon le RIN (Règlement Intérieur National du barreau).</p></div>
+    <div class="info-card"><h4>📜 Placement</h4><p style="font-size:13px;color:var(--text-mid);">Ajouté APRÈS l'audit log pour ne pas fausser les métriques de faithfulness. Le score LLM-as-judge ne doit pas évaluer le texte du disclaimer.</p></div>
   </div>
 
-  <p style="color:var(--text-mid);margin:16px 0;">Le disclaimer est ajouté automatiquement en fin de chaque réponse Claude. Il est désactivable via <code>DISABLE_DISCLAIMER=true</code> dans le <code>.env</code> — utile pour les évaluations de faithfulness où le texte du disclaimer ne doit pas être compté comme un "claim" à évaluer.</p>
-
-  <div class="code-block">
-    <div class="code-header"><span class="code-label">Exemple — Fin de réponse avec disclaimer FR</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
-    <pre><span class="c-ok">...Selon [SOURCE 3], le responsable de traitement doit mettre en place des</span>
-<span class="c-ok">mesures techniques et organisationnelles appropriées [SOURCE 1].</span>
-
-<span class="c-output">Sources utilisées : GDPR Article 24 (2016) | GDPR Recital 74 (2016)</span>
-
-<span class="c-comment">---</span>
-<span class="c-warn">⚖️ Ce système est un outil d'aide à la recherche documentaire juridique.</span>
-<span class="c-warn">Les informations fournies sont extraites de textes réglementaires officiels</span>
-<span class="c-warn">et ne constituent pas un conseil juridique. Pour toute décision ayant des</span>
-<span class="c-warn">conséquences juridiques, consultez un avocat qualifié.</span></pre>
-  </div>
-
-  <div class="callout info">
-    <div class="callout-title">Pourquoi le disclaimer est ajouté APRÈS l'audit log</div>
-    <p>L'audit log enregistre la réponse brute de Claude (sans disclaimer). Si on ajoutait le disclaimer avant, le pipeline LLM-as-judge (faithfulness) compterait les phrases du disclaimer comme des "claims" à vérifier — faussant le score. En l'ajoutant après l'audit, on garde des métriques propres tout en respectant les obligations déontologiques.</p>
-  </div>
-
+  <table class="ref-table" style="margin-top:24px;">
+    <thead><tr><th>Fichier</th><th>Action</th><th>Contenu</th></tr></thead>
+    <tbody>
+      <tr><td><code>api/audit_log.py</code></td><td><span class="badge green">Nouveau</span></td><td>JSONL rotatif, build_audit_entry(), write_audit_log(), generate_request_id()</td></tr>
+      <tr><td><code>api/search.py</code></td><td><span class="badge orange">Modifié</span></td><td>request_id + write_audit_log() + build_legal_disclaimer()</td></tr>
+      <tr><td><code>.env</code></td><td><span class="badge orange">Modifié</span></td><td>AUDIT_LOG_DIR, AUDIT_RETENTION_DAYS, DISABLE_DISCLAIMER</td></tr>
+    </tbody>
+  </table>
 </section>
 
-<!-- SECTION — TESTS UNITAIRES + CI/CD -->
+<!-- SECTION 11 — TESTS + CI/CD -->
 <section class="section" id="tests">
   <div class="section-header">
     <div class="section-number">11</div>
     <div class="section-title-block">
       <h2>Étape 11 — Tests Unitaires &amp; CI/CD GitHub Actions</h2>
-      <p>pytest · 100/100 PASSED · GitHub Actions · Automatisation · Règle 80/20</p>
+      <p>pytest · 100/100 PASSED · GitHub Actions · Règle 80/20</p>
     </div>
   </div>
-
-  <!-- GLOSSAIRE COMPLET -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:0 0 16px;">Glossaire — Tout ce qu'il faut savoir avant de lire cette section</h3>
 
   <div class="two-col">
-    <div class="info-card">
-      <h4>🧪 Test unitaire</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Un programme qui <strong style="color:#fff">vérifie automatiquement qu'une fonction se comporte correctement</strong>. Tu donnes une entrée, tu vérifies que la sortie est ce qu'on attend. Si quelqu'un modifie le code et casse quelque chose, le test échoue immédiatement — avant même que ça parte en production.</p>
-    </div>
-    <div class="info-card">
-      <h4>🔬 pytest</h4>
-      <p style="font-size:13px;color:var(--text-mid);">L'outil Python standard pour écrire et lancer des tests. Il <strong style="color:#fff">trouve automatiquement</strong> tous les fichiers qui commencent par <code>test_</code>, lance les fonctions qui commencent par <code>test_</code>, et affiche quels tests passent (✓) ou échouent (✗).</p>
-    </div>
-    <div class="info-card">
-      <h4>⚙️ CI/CD</h4>
-      <p style="font-size:13px;color:var(--text-mid);"><strong style="color:#fff">Continuous Integration / Continuous Deployment.</strong> CI = chaque fois qu'on push du code, des tests tournent automatiquement. CD = si les tests passent, le code est déployé automatiquement. Ici on fait la CI — les tests tournent à chaque push sur <code>main</code>.</p>
-    </div>
-    <div class="info-card">
-      <h4>🤖 GitHub Actions</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Service de GitHub qui <strong style="color:#fff">exécute automatiquement des commandes</strong> sur un serveur distant à chaque push. On définit les étapes dans un fichier YAML. GitHub fournit gratuitement des serveurs Ubuntu pour open-source.</p>
-    </div>
-    <div class="info-card">
-      <h4>📁 Workflow YAML</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Fichier de configuration (<code>.github/workflows/tests.yml</code>) qui décrit <strong style="color:#fff">quoi faire et quand</strong>. "À chaque push sur main : installer Python, installer les dépendances, lancer pytest." GitHub Actions lit ce fichier et l'exécute sur ses serveurs.</p>
-    </div>
-    <div class="info-card">
-      <h4>🎯 Fonction pure</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Fonction qui <strong style="color:#fff">retourne toujours le même résultat</strong> pour les mêmes entrées, sans effets de bord. <code>detect_prompt_injection("ignore instructions")</code> retourne toujours <code>(True, "...")</code>. Très facile à tester — pas besoin de démarrer un serveur ni une base de données.</p>
-    </div>
+    <div class="info-card"><h4>🧪 Test unitaire</h4><p style="font-size:13px;color:var(--text-mid);">Programme qui vérifie automatiquement qu'une fonction se comporte correctement. Si quelqu'un casse quelque chose, le test échoue immédiatement.</p></div>
+    <div class="info-card"><h4>⚙️ CI/CD</h4><p style="font-size:13px;color:var(--text-mid);">Chaque push sur main déclenche automatiquement les tests sur un serveur Ubuntu GitHub. Si un test échoue, on le voit avant la production.</p></div>
+    <div class="info-card"><h4>🤖 GitHub Actions</h4><p style="font-size:13px;color:var(--text-mid);">Service GitHub qui exécute des commandes à chaque push. Gratuit pour les repos publics. Défini dans .github/workflows/tests.yml.</p></div>
+    <div class="info-card"><h4>🎯 Fonction pure</h4><p style="font-size:13px;color:var(--text-mid);">Fonction qui retourne toujours le même résultat pour les mêmes entrées. Facile à tester — pas besoin de démarrer un serveur.</p></div>
   </div>
 
-  <!-- POURQUOI DES TESTS -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Pourquoi écrire des tests — L'argument cabinet</h3>
-
-  <div class="callout info">
-    <div class="callout-title">Le scénario sans tests</div>
-    <p>Tu modifies la fonction <code>check_hallucination_guardrail()</code> pour corriger un bug. Tu testes manuellement dans le Swagger — ça a l'air de marcher. Tu commites. Deux semaines plus tard, un client se plaint que des réponses passent avec des sources fantômes. Pourquoi ? Parce que ton correctif a cassé un cas limite que tu n'avais pas testé manuellement.</p>
+  <div class="callout danger" style="margin-top:16px;">
+    <div class="callout-title">Scénario sans tests</div>
+    <p>Tu modifies check_hallucination_guardrail(). Tu testes manuellement. Deux semaines plus tard, un client reçoit une réponse avec des sources fantômes. Le correctif avait cassé un cas limite invisible manuellement.</p>
   </div>
-
   <div class="callout success" style="margin-top:8px;">
-    <div class="callout-title">Le scénario avec tests</div>
-    <p>Tu modifies <code>check_hallucination_guardrail()</code>. Tu commites. GitHub Actions lance 22 tests sur cette fonction en 0.3 secondes. Le test <code>test_exactly_threshold_high</code> échoue. Tu vois immédiatement quelle cas limite est cassé, tu corriges avant de pusher. Le client ne voit jamais le bug.</p>
+    <div class="callout-title">Scénario avec tests</div>
+    <p>Tu commites. GitHub Actions lance 22 tests en 0.3 secondes. test_exactly_threshold_high échoue. Tu corriges avant de pusher. Le client ne voit jamais le bug.</p>
   </div>
 
-  <!-- RÈGLE 80/20 -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Règle 80/20 — Ce qu'on teste et pourquoi</h3>
-
-  <p style="color:var(--text-mid);margin-bottom:16px;">On ne teste pas <em>tout</em> — ce serait trop long à écrire et à maintenir. On applique la règle 80/20 : 20% des tests couvrent 80% des bugs potentiels. On se concentre sur :</p>
-
-  <div class="three-col">
-    <div class="info-card">
-      <h4>🎯 Cas limites (edge cases)</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Les situations à la frontière du comportement normal. <code>n_chunks=0</code>, token expiré depuis -1 seconde, question de exactement 500 caractères. C'est là que les bugs se cachent.</p>
-    </div>
-    <div class="info-card">
-      <h4>⚠️ Cas régressifs</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Ce qui a déjà cassé ou pourrait casser si on refactorise. Le test <code>test_ignore_in_legal_context</code> garantit que le mot "ignore" dans une vraie question juridique ne déclenche pas l'injection defense.</p>
-    </div>
-    <div class="info-card">
-      <h4>💼 Cas critiques métier</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Ce qui coûte cher si ça rate. Un token expiré qui passe quand même = faille de sécurité. Un guardrail HIGH qui ne bloque pas = réponse non traçable envoyée à un client.</p>
-    </div>
-  </div>
-
-  <!-- LES 4 FICHIERS DE TESTS -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Les 4 fichiers de tests — Ce qui est testé et pourquoi</h3>
-
-  <table class="ref-table">
-    <thead><tr><th>Fichier</th><th>Teste quoi</th><th>Nb tests</th><th>Pourquoi ces tests</th></tr></thead>
+  <table class="ref-table" style="margin-top:24px;">
+    <thead><tr><th>Fichier</th><th>Teste quoi</th><th>Tests</th></tr></thead>
     <tbody>
-      <tr>
-        <td><code>test_injection.py</code></td>
-        <td><code>detect_prompt_injection()</code></td>
-        <td><span style="color:var(--green);font-family:var(--mono)">24</span></td>
-        <td>Les faux positifs (vraies questions bloquées) sont aussi dangereux que les vrais positifs manqués. On teste les deux.</td>
-      </tr>
-      <tr>
-        <td><code>test_guardrail.py</code></td>
-        <td><code>check_hallucination_guardrail()</code></td>
-        <td><span style="color:var(--green);font-family:var(--mono)">22</span></td>
-        <td>Les seuils LOW/HIGH sont critiques. On teste les valeurs exactes (2 fantômes = HIGH, 1 = LOW) pour éviter les off-by-one.</td>
-      </tr>
-      <tr>
-        <td><code>test_auth.py</code></td>
-        <td>JWT + API keys + rate limiting</td>
-        <td><span style="color:var(--green);font-family:var(--mono)">22</span></td>
-        <td>La sécurité ne se teste pas manuellement. Un token expiré qui passe, un hash non déterministe, un compteur rate limit partagé — bugs invisibles sans tests.</td>
-      </tr>
-      <tr>
-        <td><code>test_audit_disclaimer.py</code></td>
-        <td>Audit log + disclaimer</td>
-        <td><span style="color:var(--green);font-family:var(--mono)">27</span></td>
-        <td>Le JSONL doit rester valide même après des milliers d'entrées. Le disclaimer doit mentionner explicitement "pas un conseil juridique".</td>
-      </tr>
+      <tr><td><code>test_injection.py</code></td><td>detect_prompt_injection()</td><td><span style="color:var(--green);font-family:var(--mono)">24</span></td></tr>
+      <tr><td><code>test_guardrail.py</code></td><td>check_hallucination_guardrail()</td><td><span style="color:var(--green);font-family:var(--mono)">22</span></td></tr>
+      <tr><td><code>test_auth.py</code></td><td>JWT + API keys + rate limiting</td><td><span style="color:var(--green);font-family:var(--mono)">22</span></td></tr>
+      <tr><td><code>test_audit_disclaimer.py</code></td><td>Audit log + disclaimer</td><td><span style="color:var(--green);font-family:var(--mono)">27</span></td></tr>
     </tbody>
   </table>
 
   <div class="result-box" style="margin-top:16px;">
-    <div class="result-title">✓ Résultat — venv/bin/python -m pytest tests/ -v</div>
-    <pre><span class="c-output">platform darwin -- Python 3.12 · pytest 9.0.2</span>
-<span class="c-output">collected 100 items</span>
-
-<span class="c-ok">tests/test_audit_disclaimer.py  ......................  27 passed</span>
-<span class="c-ok">tests/test_auth.py              ......................  22 passed</span>
-<span class="c-ok">tests/test_guardrail.py         ......................  22 passed</span>
-<span class="c-ok">tests/test_injection.py         ........................  24 passed</span>
-
-<span class="c-ok">========================= 100 passed in 2.14s =========================</span></pre>
+    <div class="result-title">✓ GitHub Actions — 100 passed in 1.69s</div>
+    <pre><span class="c-ok">tests/test_audit_disclaimer.py  27 passed</span>
+<span class="c-ok">tests/test_auth.py              22 passed</span>
+<span class="c-ok">tests/test_guardrail.py         22 passed</span>
+<span class="c-ok">tests/test_injection.py         24 passed</span>
+<span class="c-ok">========================= 100 passed in 1.69s =========================</span></pre>
   </div>
 
-  <!-- GITHUB ACTIONS — MINI COURS -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">GitHub Actions — Mini cours complet</h3>
-
-  <p style="color:var(--text-mid);margin-bottom:16px;">GitHub Actions est un service intégré à GitHub qui permet d'automatiser des tâches. Pour nous, c'est simple : à chaque push sur <code>main</code>, GitHub lance nos tests sur un serveur Ubuntu distant. Si un test échoue, on reçoit une notification et on voit exactement lequel.</p>
-
-  <div class="callout info">
-    <div class="callout-title">Comment ça marche concrètement — De ton terminal à GitHub</div>
-    <p><strong style="color:#fff">1. Tu fais <code>git push origin main</code></strong> sur ton Mac.</p>
-    <p style="margin-top:6px;"><strong style="color:#fff">2. GitHub reçoit le code</strong> et détecte le fichier <code>.github/workflows/tests.yml</code>.</p>
-    <p style="margin-top:6px;"><strong style="color:#fff">3. GitHub démarre une machine virtuelle Ubuntu</strong> sur ses serveurs (gratuit pour les repos publics).</p>
-    <p style="margin-top:6px;"><strong style="color:#fff">4. La machine exécute les étapes du workflow</strong> : clone le repo, installe Python 3.12, installe les dépendances, lance <code>pytest tests/ -v</code>.</p>
-    <p style="margin-top:6px;"><strong style="color:#fff">5. Résultat visible sur GitHub</strong> → onglet Actions → ✅ vert si tous les tests passent, ❌ rouge sinon.</p>
-  </div>
-
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Anatomie du fichier workflow — Chaque ligne expliquée</h3>
-
-  <div class="code-block">
-    <div class="code-header"><span class="code-label">.github/workflows/tests.yml — Annoté ligne par ligne</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
-    <pre><span class="c-keyword">name</span>: Tests CI              <span class="c-comment">← nom affiché dans l'onglet Actions de GitHub</span>
-
-<span class="c-keyword">on</span>:                          <span class="c-comment">← quand déclencher ce workflow</span>
-  <span class="c-keyword">push</span>:
-    <span class="c-keyword">branches</span>: [ main ]        <span class="c-comment">← à chaque push sur la branche main</span>
-  <span class="c-keyword">pull_request</span>:
-    <span class="c-keyword">branches</span>: [ main ]        <span class="c-comment">← aussi sur les pull requests vers main</span>
-
-<span class="c-keyword">jobs</span>:                        <span class="c-comment">← liste des "jobs" à exécuter</span>
-  <span class="c-keyword">test</span>:                      <span class="c-comment">← nom de notre job</span>
-    <span class="c-keyword">runs-on</span>: ubuntu-latest   <span class="c-comment">← type de machine (Ubuntu gratuit)</span>
-
-    <span class="c-keyword">steps</span>:                   <span class="c-comment">← étapes exécutées dans l'ordre</span>
-      - <span class="c-keyword">uses</span>: actions/checkout@v4     <span class="c-comment">← clone le repo sur la machine</span>
-      - <span class="c-keyword">uses</span>: actions/setup-python@v5   <span class="c-comment">← installe Python 3.12</span>
-        <span class="c-keyword">with</span>:
-          <span class="c-keyword">python-version</span>: <span class="c-string">"3.12"</span>
-
-      - <span class="c-keyword">name</span>: Install test dependencies
-        <span class="c-keyword">run</span>: |
-          pip install pytest pytest-cov    <span class="c-comment">← outil de test</span>
-          pip install PyJWT cryptography  <span class="c-comment">← dépendances auth</span>
-          pip install fastapi pydantic     <span class="c-comment">← framework API</span>
-          <span class="c-comment"># NE PAS installer faiss/sentence-transformers</span>
-          <span class="c-comment"># → trop lourds, inutiles pour les tests unitaires</span>
-
-      - <span class="c-keyword">name</span>: Run unit tests
-        <span class="c-keyword">env</span>:
-          JWT_SECRET_KEY: <span class="c-string">"ci_test_secret..."</span>  <span class="c-comment">← clé de test, jamais la vraie</span>
-        <span class="c-keyword">run</span>: python -m pytest tests/ -v --tb=short</pre>
-  </div>
-
-  <div class="callout warning">
+  <div class="callout warning" style="margin-top:16px;">
     <div class="callout-title">Pourquoi on n'installe pas requirements.txt complet en CI</div>
-    <p>Le <code>requirements.txt</code> complet inclut <code>faiss-cpu</code>, <code>sentence-transformers</code> et <code>torch</code> — des packages qui pèsent plusieurs gigaoctets et prennent 5-10 minutes à installer. Les tests unitaires <strong style="color:#fff">n'utilisent pas ces packages</strong> — ils testent uniquement des fonctions pures (injection, guardrail, auth, audit). On installe uniquement <code>pytest</code>, <code>PyJWT</code>, <code>fastapi</code> et <code>pydantic</code> — les vraies dépendances des fonctions testées.</p>
+    <p>faiss-cpu, sentence-transformers et torch pèsent plusieurs gigaoctets. Les tests unitaires n'utilisent pas ces packages. On installe seulement pytest, PyJWT, fastapi et pydantic.</p>
   </div>
-
-  <!-- STRUCTURE DES FICHIERS DE TEST -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Structure d'un fichier de test — Comment ça s'écrit</h3>
-
-  <div class="code-block">
-    <div class="code-header"><span class="code-label">tests/test_guardrail.py — Extrait annoté</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
-    <pre><span class="c-comment"># On importe la fonction à tester directement</span>
-<span class="c-keyword">from</span> api.search <span class="c-keyword">import</span> check_hallucination_guardrail
-
-<span class="c-comment"># Une classe = un groupe de tests liés</span>
-<span class="c-keyword">class</span> <span class="c-cmd">TestHighSeverity</span>:
-
-    <span class="c-keyword">def</span> <span class="c-cmd">test_two_ghost_sources</span>(<span class="c-flag">self</span>):
-        <span class="c-comment">"""2 sources fantômes → severity HIGH, réponse bloquée."""</span>
-        result = check_hallucination_guardrail(
-            <span class="c-string">"[SOURCE 7] and [SOURCE 9] both confirm this."</span>,
-            n_chunks=<span class="c-flag">5</span>   <span class="c-comment">← k=5, donc SOURCE 7 et 9 sont fantômes</span>
-        )
-        <span class="c-keyword">assert</span> result[<span class="c-string">"severity"</span>] == <span class="c-string">"high"</span>      <span class="c-comment">← vérifie le résultat</span>
-        <span class="c-keyword">assert</span> result[<span class="c-string">"response_patched"</span>] <span class="c-keyword">is None</span>  <span class="c-comment">← réponse bloquée = None</span>
-
-    <span class="c-keyword">def</span> <span class="c-cmd">test_exactly_threshold_high</span>(<span class="c-flag">self</span>):
-        <span class="c-comment">"""Exactement 2 fantômes = seuil HIGH (test du off-by-one)."""</span>
-        result = check_hallucination_guardrail(
-            <span class="c-string">"[SOURCE 6] and [SOURCE 7]."</span>, n_chunks=<span class="c-flag">5</span>
-        )
-        <span class="c-keyword">assert</span> result[<span class="c-string">"severity"</span>] == <span class="c-string">"high"</span>  <span class="c-comment">← pas "low", exactement "high"</span></pre>
-  </div>
-
-  <!-- QUAND LES TESTS SONT LANCÉS -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Quand les tests sont lancés — Les deux contextes</h3>
-
-  <div class="two-col">
-    <div class="info-card">
-      <h4>🖥 En local — Avant de committer</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Tu peux lancer les tests manuellement pour vérifier que tes modifications ne cassent rien :</p>
-      <pre style="background:var(--bg3);padding:12px;border-radius:4px;font-size:12px;margin-top:8px;"><span style="color:var(--c-ok)">venv/bin/python -m pytest tests/ -v</span></pre>
-      <p style="font-size:13px;color:var(--text-mid);margin-top:8px;">Résultat en ~2 secondes. Bonne pratique : lancer avant chaque <code>git push</code>.</p>
-    </div>
-    <div class="info-card">
-      <h4>☁️ En CI — À chaque push sur GitHub</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Automatiquement déclenché. Tu n'as rien à faire — GitHub s'en charge. Si les tests échouent, tu reçois un email et tu vois l'erreur dans l'onglet Actions. Le badge sur le README peut afficher ✅ ou ❌ selon l'état des tests.</p>
-    </div>
-  </div>
-
-  <!-- FICHIERS -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Fichiers créés</h3>
-
-  <table class="ref-table">
-    <thead><tr><th>Fichier</th><th>Rôle</th></tr></thead>
-    <tbody>
-      <tr><td><code>tests/test_injection.py</code></td><td>24 tests sur detect_prompt_injection()</td></tr>
-      <tr><td><code>tests/test_guardrail.py</code></td><td>22 tests sur check_hallucination_guardrail()</td></tr>
-      <tr><td><code>tests/test_auth.py</code></td><td>22 tests sur JWT, API keys, rate limiting</td></tr>
-      <tr><td><code>tests/test_audit_disclaimer.py</code></td><td>27 tests sur audit log et disclaimer</td></tr>
-      <tr><td><code>tests/conftest.py</code></td><td>Configuration globale pytest — variables d'env de test</td></tr>
-      <tr><td><code>tests/__init__.py</code></td><td>Marqueur de package Python pour les imports</td></tr>
-      <tr><td><code>.github/workflows/tests.yml</code></td><td>Workflow GitHub Actions — CI automatique à chaque push</td></tr>
-    </tbody>
-  </table>
-
 </section>
 
-
-
-<!-- SECTION — FRONTEND STREAMLIT -->
+<!-- SECTION 12 — FRONTEND STREAMLIT -->
 <section class="section" id="frontend">
   <div class="section-header">
     <div class="section-number">12</div>
     <div class="section-title-block">
-      <h2>Étape 12 — Frontend Streamlit : Lex AI</h2>
-      <p>Interface utilisateur · Streamlit · Switch FR/EN · Tooltips · Sources cliquables · Logo Themis</p>
+      <h2>Étape 12 — Frontend Streamlit (Lex AI)</h2>
+      <p>Streamlit · Lex AI · Themis · Switch FR/EN · Tooltips · Sources · Historique</p>
     </div>
   </div>
-
-  <!-- POURQUOI STREAMLIT -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:0 0 16px;">Pourquoi Streamlit — Choix du framework</h3>
 
   <div class="two-col">
-    <div class="info-card">
-      <h4>🐍 Streamlit</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Framework Python qui transforme un script en application web interactive sans écrire une ligne de HTML/CSS/JavaScript. <strong style="color:#fff">100% Python</strong>, démarrage en 5 minutes, idéal pour prototyper une interface professionnelle rapidement.</p>
-    </div>
-    <div class="info-card">
-      <h4>⚡ Avantages pour ce projet</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Même stack Python que l'API, rechargement automatique à chaque modification, composants prêts à l'emploi (sliders, toggles, expanders). Pas besoin de déployer un serveur Node.js séparé pour le MVP.</p>
-    </div>
+    <div class="info-card"><h4>🖥 Frontend</h4><p style="font-size:13px;color:var(--text-mid);">Interface visuelle que l'utilisateur voit. Distinct du backend (API FastAPI). Le frontend Streamlit communique avec l'API via des requêtes HTTP.</p></div>
+    <div class="info-card"><h4>🎈 Streamlit</h4><p style="font-size:13px;color:var(--text-mid);">Framework Python qui crée des interfaces web sans HTML/CSS/JS. On décrit l'interface en Python, Streamlit génère le HTML. Idéal pour les outils internes.</p></div>
+    <div class="info-card"><h4>🔄 Session State</h4><p style="font-size:13px;color:var(--text-mid);">Mécanisme Streamlit pour conserver des données entre interactions. Utilisé pour l'historique, la langue FR/EN, et le token JWT courant.</p></div>
+    <div class="info-card"><h4>🌐 i18n</h4><p style="font-size:13px;color:var(--text-mid);">Internationalisation — support plusieurs langues. Le switch FR/EN bascule tous les labels : sidebar, placeholder, boutons, titres.</p></div>
   </div>
 
-  <!-- LANCER -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Lancer le frontend</h3>
+  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Fonctionnalités UX notables</h3>
 
-  <div class="code-block">
-    <div class="code-header"><span class="code-label">bash — Démarrage (2 terminaux)</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
-    <pre><span class="c-comment"># Terminal 1 — API FastAPI</span>
+  <div class="three-col">
+    <div class="info-card"><h4>🔍 Tooltips sources</h4><p style="font-size:13px;color:var(--text-mid);">Survol de [SOURCE X] dans le texte → infobulle avec titre, règlement, année. Survol carte source → tooltip fond noir avec flèche.</p></div>
+    <div class="info-card"><h4>🔗 Navigation références</h4><p style="font-size:13px;color:var(--text-mid);">Clic sur une référence → scroll smooth vers la carte source + highlight teal temporaire (1.5s).</p></div>
+    <div class="info-card"><h4>📖 Texte complet</h4><p style="font-size:13px;color:var(--text-mid);">Aperçu 200 chars par source. Expander "Lire le texte complet" pour le chunk entier.</p></div>
+    <div class="info-card"><h4>🌐 Switch FR/EN</h4><p style="font-size:13px;color:var(--text-mid);">Deux boutons en haut à droite. Bascule tous les labels de l'interface.</p></div>
+    <div class="info-card"><h4>📜 Historique</h4><p style="font-size:13px;color:var(--text-mid);">10 dernières requêtes en session state. Cliquables pour ré-afficher le résultat.</p></div>
+    <div class="info-card"><h4>↑ Retour en haut</h4><p style="font-size:13px;color:var(--text-mid);">Bouton fixe via st.components.v1.html — contourne le Shadow DOM pour scroller le vrai conteneur.</p></div>
+  </div>
+
+  <div class="code-block" style="margin-top:24px;">
+    <div class="code-header"><span class="code-label">bash — Lancer l'interface</span><div class="code-dots"><div class="code-dot red"></div><div class="code-dot yellow"></div><div class="code-dot green"></div></div></div>
+    <pre><span class="c-comment"># Terminal 1 — API</span>
 <span class="c-cmd">TRANSFORMERS_OFFLINE=1 venv/bin/python -m uvicorn api.main:app --reload --port 8000</span>
 
 <span class="c-comment"># Terminal 2 — Frontend Streamlit</span>
 <span class="c-cmd">venv/bin/streamlit run frontend/app.py</span>
-
-<span class="c-comment"># Ouvrir dans le navigateur</span>
-<span class="c-ok">http://localhost:8501</span></pre>
+<span class="c-output">→ http://localhost:8501</span></pre>
   </div>
 
-  <!-- GLOSSAIRE -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Glossaire — Termes clés</h3>
-
-  <div class="two-col">
-    <div class="info-card">
-      <h4>🗂 Session State</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Streamlit re-exécute tout le script à chaque interaction. <code>st.session_state</code> permet de <strong style="color:#fff">persister des données</strong> entre les re-exécutions — le token JWT, l'historique des requêtes, la langue sélectionnée.</p>
-    </div>
-    <div class="info-card">
-      <h4>🔑 JWT dans le frontend</h4>
-      <p style="font-size:13px;color:var(--text-mid);">L'interface obtient automatiquement un token demo via <code>POST /auth/token/demo</code> au premier appel. Ce token est stocké dans <code>session_state</code> et envoyé dans le header <code>Authorization: Bearer</code> à chaque requête.</p>
-    </div>
-    <div class="info-card">
-      <h4>🌐 i18n FR/EN</h4>
-      <p style="font-size:13px;color:var(--text-mid);"><strong style="color:#fff">Internationalisation</strong> — adaptation de l'interface à la langue choisie. Deux boutons FR/EN en haut à droite basculent tous les labels : sidebar, placeholder, bouton recherche, titres de sections.</p>
-    </div>
-    <div class="info-card">
-      <h4>🔤 base64</h4>
-      <p style="font-size:13px;color:var(--text-mid);">Encodage qui convertit une image binaire en texte ASCII. Utilisé pour injecter le logo directement dans le HTML sans passer par un serveur de fichiers — évite le flou du redimensionnement Streamlit.</p>
-    </div>
-  </div>
-
-  <!-- ARCHITECTURE FRONTEND -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Architecture de l'interface — Ce que voit l'utilisateur</h3>
-
-  <div class="flow-steps">
-    <div class="flow-step">
-      <div class="flow-step-num">1</div>
-      <div class="flow-step-content">
-        <h4>Sidebar — Navigation permanente</h4>
-        <p>Logo Lex AI / Themis (120px, fond transparent, encodé en base64). Titre "Lex AI" + tagline "Your AI Legal Companion". Statut API avec nombre de vecteurs. Filtres : réglementation, langue de réponse, k (slider 3-10), reranking toggle. Switch FR/EN. Historique des 10 dernières requêtes cliquables.</p>
-      </div>
-    </div>
-    <div class="flow-step">
-      <div class="flow-step-num">2</div>
-      <div class="flow-step-content">
-        <h4>Header — Identification du corpus</h4>
-        <p>Titre "Recherche sur le corpus du droit européen" en Playfair Display. Cinq pills arrondies : GDPR, EU AI Act, DGA, EDPB, CNIL — chacune avec un tooltip CSS custom (fond noir, texte blanc, flèche) qui décrit synthétiquement la réglementation au survol.</p>
-      </div>
-    </div>
-    <div class="flow-step">
-      <div class="flow-step-num">3</div>
-      <div class="flow-step-content">
-        <h4>Zone de recherche — Instructions + champ + bouton</h4>
-        <p>Bloc "Instructions" sobre au-dessus du champ — texte de contexte avec bordure gauche fine. Champ de saisie avec placeholder bilingue. Bouton "🔎 Rechercher" à droite. Expander "Questions suggérées" avec exemples pré-remplis cliquables.</p>
-      </div>
-    </div>
-    <div class="flow-step">
-      <div class="flow-step-num">4</div>
-      <div class="flow-step-content">
-        <h4>Réponse — Texte généré avec citations interactives</h4>
-        <p>Métriques rapides (latence, sources, modèle, query expansion). Texte Markdown converti en HTML (##, **). Badges [SOURCE X] en vert avec tooltip au survol — titre officiel, réglementation, année, page. Disclaimer légal propre en bas.</p>
-      </div>
-    </div>
-    <div class="flow-step">
-      <div class="flow-step-num">5</div>
-      <div class="flow-step-content">
-        <h4>Sources — Références cliquables et texte complet</h4>
-        <p>Expander "Références citées" — liste cliquable avec scroll smooth + highlight teal vers la source correspondante. Cartes sources avec scores FAISS / Rerank, tooltip au survol (fond noir), aperçu 200 chars. Expander "Lire le texte complet" pour chaque source.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- FONCTIONNALITÉS TECHNIQUES -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Fonctionnalités techniques notables</h3>
-
-  <table class="ref-table">
-    <thead><tr><th>Fonctionnalité</th><th>Implémentation</th><th>Pourquoi</th></tr></thead>
+  <table class="ref-table" style="margin-top:24px;">
+    <thead><tr><th>Fichier</th><th>Action</th><th>Contenu</th></tr></thead>
     <tbody>
-      <tr>
-        <td>Tooltips CSS custom</td>
-        <td><code>::after</code> + <code>attr(data-tip)</code></td>
-        <td>Le tooltip natif HTML (<code>title=</code>) est gris et non stylisable. Le CSS custom donne fond noir, flèche, typographie maîtrisée.</td>
-      </tr>
-      <tr>
-        <td>Logo sans flou</td>
-        <td>Encodage base64 inline dans le HTML</td>
-        <td><code>st.image()</code> redimensionne l'image via Streamlit et crée du flou. L'injection base64 bypasse ce traitement.</td>
-      </tr>
-      <tr>
-        <td>Sidebar toujours visible</td>
-        <td>CSS <code>[data-testid="collapsedControl"] { display: none }</code></td>
-        <td>Streamlit mémorise l'état "fermé" dans localStorage. Masquer le bouton empêche l'utilisateur de fermer la sidebar accidentellement.</td>
-      </tr>
-      <tr>
-        <td>Références cliquables → Sources</td>
-        <td>Ancres HTML + <code>scrollIntoView()</code> JavaScript</td>
-        <td>Chaque carte source a un <code>id="source-card-{i}"</code>. Le clic dans "Références citées" scrolle et surligne temporairement en teal.</td>
-      </tr>
-      <tr>
-        <td>Markdown dans la réponse</td>
-        <td>Regex Python → HTML (<code>##</code>, <code>**</code>, <code>*</code>)</td>
-        <td>La réponse Claude est injectée dans un <code>&lt;div&gt;</code> HTML custom — Streamlit ne parse pas le Markdown dedans. Conversion manuelle nécessaire.</td>
-      </tr>
-      <tr>
-        <td>Bouton retour en haut</td>
-        <td><code>st.components.v1.html()</code> avec <code>window.parent</code></td>
-        <td>Streamlit tourne dans un iframe. <code>window.scrollTo()</code> ne scroll que l'iframe. <code>st.components.v1.html()</code> a accès à <code>window.parent</code> pour scroller la vraie page.</td>
-      </tr>
+      <tr><td><code>frontend/app.py</code></td><td><span class="badge green">Nouveau</span></td><td>App Streamlit complète — auth JWT, filtres, réponse, sources, tooltips, i18n, 900+ lignes</td></tr>
+      <tr><td><code>frontend/lexai_notext.png</code></td><td><span class="badge green">Nouveau</span></td><td>Logo Lex AI (Themis) fond transparent, sidebar 120px</td></tr>
+      <tr><td><code>frontend/.streamlit/config.toml</code></td><td><span class="badge green">Nouveau</span></td><td>primaryColor teal #2a9d8f, fond blanc, texte #1a1a2e</td></tr>
     </tbody>
   </table>
-
-  <!-- STRUCTURE FICHIERS -->
-  <h3 style="font-family:var(--mono);font-size:14px;color:var(--gold2);margin:32px 0 16px;">Fichiers créés</h3>
-
-  <table class="ref-table">
-    <thead><tr><th>Fichier</th><th>Rôle</th></tr></thead>
-    <tbody>
-      <tr><td><code>frontend/app.py</code></td><td>Application Streamlit complète — 900+ lignes</td></tr>
-      <tr><td><code>frontend/lexai_notext.png</code></td><td>Logo Lex AI (Themis) — fond transparent, utilisé dans la sidebar (120px)</td></tr>
-      <tr><td><code>frontend/.streamlit/config.toml</code></td><td>Thème Streamlit — primaryColor teal #2a9d8f, fond blanc</td></tr>
-    </tbody>
-  </table>
-
-  <!-- LIMITES STREAMLIT -->
-  <div class="callout warning" style="margin-top:24px;">
-    <div class="callout-title">Limites connues de Streamlit — À garder en tête</div>
-    <p><strong style="color:#fff">Re-exécution complète à chaque interaction</strong> : Streamlit relance tout le script Python à chaque clic. Pour les éléments lourds (requêtes API), il faut gérer l'état explicitement via <code>session_state</code>.</p>
-    <p style="margin-top:8px;"><strong style="color:#fff">CSS limité</strong> : Streamlit injecte ses propres styles après les CSS custom — certains éléments (boutons notamment) sont difficiles à styler de manière fiable. Les styles sur les composants natifs Streamlit nécessitent des sélecteurs très spécifiques ou du JavaScript.</p>
-    <p style="margin-top:8px;"><strong style="color:#fff">iframe</strong> : Les composants HTML (<code>st.markdown()</code>) tournent dans un iframe isolé. Le JavaScript ne peut pas directement accéder à la page parente sans passer par <code>st.components.v1.html()</code>.</p>
-    <p style="margin-top:8px;"><strong style="color:#fff">localStorage</strong> : Streamlit stocke l'état de la sidebar dans le localStorage du navigateur. En cas de bug d'affichage, vider le localStorage (<code>localStorage.clear()</code> dans la console) restaure l'état initial.</p>
-  </div>
-
 </section>
+
+</div><!-- end main -->
+
+</div><!-- end main -->
+
 
 <!-- FOOTER -->
 <div class="footer">
   <div class="footer-left">
-    AI Legal Governance Platform<br>
-    Python 3.12 · FastAPI · FAISS · Claude Sonnet 4 · Docker<br>
+    AI Legal Governance Platform · Lex AI<br>
+    Python 3.12 · FastAPI · FAISS · Claude Sonnet 4 · Streamlit<br>
     github.com/gael-cvc/AI-Legal-Governance-Platform
   </div>
   <div class="footer-right">
-    Documentation Technique v6.0<br>
-    <span style="font-size:11px;color:var(--text-dim)">100 tests · CI GitHub Actions · JWT Auth · Audit Log</span>
+    Documentation Technique v7.0<br>
+    <span style="font-size:11px;color:var(--text-dim)">100 tests · CI · JWT · Audit · Frontend</span>
   </div>
 </div>
 
