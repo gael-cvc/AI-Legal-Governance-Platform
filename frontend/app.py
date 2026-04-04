@@ -11,6 +11,7 @@ CONFIGURATION :
 """
 
 import streamlit as st
+import re as _re_md
 import requests
 import json
 import time
@@ -833,42 +834,70 @@ if result and result.get("answer"):
         return _re.sub(r'\[SOURCE\s+(\d+)\]', replace_source, text)
 
     main_answer_with_tips = inject_source_tooltips(main_answer, result.get("sources", []))
-    st.markdown(f'<div class="response-container">{main_answer_with_tips}</div>',
-                unsafe_allow_html=True)
 
-    if disclaimer_text:
-        # Nettoyer les ** et ⚖️ et convertir les - en lignes séparées
-        clean = disclaimer_text.replace("⚖️", "").replace("**", "").replace("*", "").strip()
-        # Convertir les tirets de liste Markdown en <br> propres
-        import re as _re2
-        lines = clean.split("\n")
-        html_lines = []
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith("- "):
-                html_lines.append(f'<div style="padding:1px 0;">— {line[2:]}</div>')
-            else:
-                html_lines.append(f'<div style="padding:2px 0;">{line}</div>')
-        clean_html = "".join(html_lines)
-        st.markdown(f'''<div class="disclaimer" style="font-style:normal;line-height:1.8;">
-            {clean_html}
-        </div>''', unsafe_allow_html=True)
+    def md_to_html(text):
+        h4_style = "font-family:Playfair Display,serif;font-size:1rem;color:#1a1a2e;margin:1.2em 0 0.4em;"
+        h3_style = "font-family:Playfair Display,serif;font-size:1.1rem;color:#1a1a2e;margin:1.4em 0 0.5em;"
+        text = _re_md.sub(r"^### (.+)$", lambda m: f'<h4 style="{h4_style}">{m.group(1)}</h4>', text, flags=_re_md.MULTILINE)
+        text = _re_md.sub(r"^## (.+)$",  lambda m: f'<h3 style="{h3_style}">{m.group(1)}</h3>', text, flags=_re_md.MULTILINE)
+        text = _re_md.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+        text = _re_md.sub(r"\*(.+?)\*",   r"<em>\1</em>", text)
+        text = text.replace("\n\n", "</p><p>")
+        return f"<p>{text}</p>"
+
+    rendered_answer = md_to_html(main_answer_with_tips)
+    st.markdown(f'<div class="response-container">{rendered_answer}</div>',
+                unsafe_allow_html=True)
 
     st.markdown('<hr class="divider">', unsafe_allow_html=True)
 
     # Sources
     sources = result.get("sources", [])
     if sources:
-        sources_title = f"Sources used ({len(sources)})" if st.session_state.get("ui_lang","fr") == "en" else f"Sources utilisées ({len(sources)})"
+        # ── Références citées en haut ─────────────────────────────────────────
+        _cit_title = "References" if st.session_state.get("ui_lang","fr") == "en" else "Références citées"
+        with st.expander(_cit_title):
+            cit_rows = []
+            for i, src in enumerate(sources, 1):
+                official_title = src.get("official_title", "") or src.get("segment_id", "")
+                reg  = src.get("regulation", "")
+                year = src.get("year", "")
+                page = src.get("page_start", "")
+                parts = []
+                if official_title: parts.append(official_title)
+                if reg and reg not in official_title: parts.append(reg)
+                if year: parts.append(f"({year})")
+                if page: parts.append(f"p. {page}")
+                label = " · ".join(str(p) for p in parts) if parts else src.get("segment_id","")
+                cit_rows.append(f'''
+                <a href="#source-card-{i}"
+                   onclick="setTimeout(()=>{{document.getElementById('source-card-{i}')
+                   ?.scrollIntoView({{behavior:'smooth',block:'center'}});
+                   document.getElementById('source-card-{i}')
+                   ?.style.setProperty('border-color','#2a9d8f');
+                   setTimeout(()=>document.getElementById('source-card-{i}')
+                   ?.style.setProperty('border-color',''),1500);}},100);return false;"
+                   style="display:flex;align-items:baseline;gap:10px;
+                          padding:6px 0;border-bottom:1px solid #f3f4f6;
+                          text-decoration:none;cursor:pointer;">
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;
+                                 color:#9ca3af;min-width:70px;">[SOURCE {i}]</span>
+                    <span style="font-size:0.8125rem;color:#374151;line-height:1.5;
+                                 transition:color 0.15s;"
+                          onmouseover="this.style.color='#2a9d8f'"
+                          onmouseout="this.style.color='#374151'">{label}</span>
+                </a>''')
+            st.markdown(f'<div style="padding:0.25rem 0;">{"".join(cit_rows)}</div>',
+                        unsafe_allow_html=True)
+
+        # ── Cartes sources ────────────────────────────────────────────────────
+        sources_title = "Sources" if st.session_state.get("ui_lang","fr") == "en" else "Sources"
         st.markdown(f"#### {sources_title}")
 
         for i, src in enumerate(sources, 1):
             seg_id    = src.get("segment_id", "—")
             reg       = src.get("regulation", "—")
             year      = src.get("year", "")
-            text      = src.get("text", "")[:300] + "..." if src.get("text") else ""
             faiss_sc  = src.get("similarity_score", 0)
             rerank_sc = src.get("rerank_score")
 
@@ -883,13 +912,14 @@ if result and result.get("answer"):
             preview_text  = full_text[:200] + "..." if len(full_text) > 200 else full_text
             tooltip_parts = []
             if official_title: tooltip_parts.append(official_title)
+            if reg:            tooltip_parts.append(f"Réglementation : {reg}")
+            if year:           tooltip_parts.append(f"Année : {year}")
             if jurisdiction:   tooltip_parts.append(f"Juridiction : {jurisdiction}")
             if page_start:     tooltip_parts.append(f"Page : {page_start}")
-            if reg:            tooltip_parts.append(f"Réglementation : {reg}")
             tooltip_html = "<br>".join(tooltip_parts) if tooltip_parts else seg_id
 
             st.markdown(f"""
-            <div class="source-card">
+            <div class="source-card" id="source-card-{i}">
                 <div class="source-tooltip">{tooltip_html}</div>
                 <div class="source-title">[SOURCE {i}] {seg_id}</div>
                 <div class="source-meta">
@@ -910,31 +940,25 @@ if result and result.get("answer"):
                     </div>
                     """, unsafe_allow_html=True)
 
-    # Références — une par ligne, avec titre officiel depuis sources[]
-    if sources:
-        _cit_title = "References" if st.session_state.get("ui_lang","fr") == "en" else "Références citées"
-        with st.expander(_cit_title):
-            cit_rows = []
-            for i, src in enumerate(sources, 1):
-                official_title = src.get("official_title", "") or src.get("segment_id", "")
-                reg  = src.get("regulation", "")
-                year = src.get("year", "")
-                page = src.get("page_start", "")
-                parts = []
-                if official_title: parts.append(official_title)
-                if reg and reg not in official_title: parts.append(reg)
-                if year: parts.append(f"({year})")
-                if page: parts.append(f"p. {page}")
-                label = " · ".join(str(p) for p in parts) if parts else src.get("segment_id","")
-                cit_rows.append(f'''
-                <div style="display:flex;align-items:baseline;gap:10px;
-                            padding:6px 0;border-bottom:1px solid #f3f4f6;">
-                    <span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;
-                                 color:#9ca3af;min-width:70px;">[SOURCE {i}]</span>
-                    <span style="font-size:0.8125rem;color:#374151;line-height:1.5;">{label}</span>
-                </div>''')
-            st.markdown(f'<div style="padding:0.25rem 0;">{"".join(cit_rows)}</div>',
-                        unsafe_allow_html=True)
+    # ── Disclaimer seul (sans les sources redondantes) ────────────────────────
+    if disclaimer_text:
+        clean = disclaimer_text.replace("⚖️", "").replace("**", "").replace("*", "").strip()
+        # Garder uniquement la phrase disclaimer, supprimer les lignes "- source"
+        import re as _re2
+        lines = clean.split("\n")
+        disclaimer_lines = []
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("- ") or line.startswith("Sources"):
+                continue
+            if line.startswith("---"):
+                continue
+            disclaimer_lines.append(f'<div style="padding:2px 0;">{line}</div>')
+        if disclaimer_lines:
+            clean_html = "".join(disclaimer_lines)
+            st.markdown(f'''<div class="disclaimer" style="font-style:normal;line-height:1.8;margin-top:1rem;">
+                {clean_html}
+            </div>''', unsafe_allow_html=True)
 
 elif not result:
 
@@ -962,3 +986,48 @@ elif not result:
                         st.rerun()
                 except Exception:
                     st.error("API non disponible")
+
+
+# ── BOUTON RETOUR EN HAUT ──────────────────────────────────────────────────────
+import streamlit.components.v1 as _components
+_components.html("""
+<style>
+#btn-top {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 9999;
+    background: #1a1a2e;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 42px;
+    height: 42px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    transition: background 0.15s;
+    opacity: 0.8;
+    line-height: 1;
+}
+#btn-top:hover { background: #2a9d8f; opacity: 1; }
+</style>
+<button id="btn-top" title="Retour en haut" onclick="
+    try {
+        // Streamlit main scroll container
+        var candidates = [
+            window.parent.document.querySelector('section.main'),
+            window.parent.document.querySelector('[data-testid=stAppViewContainer]'),
+            window.parent.document.querySelector('[data-testid=stMain]'),
+            window.parent.document.querySelector('.main'),
+            window.parent.document.documentElement,
+            window.parent.document.body
+        ];
+        for (var i=0; i<candidates.length; i++) {
+            if (candidates[i]) {
+                candidates[i].scrollTo({top:0, behavior:'smooth'});
+            }
+        }
+    } catch(e) {}
+">↑</button>
+""", height=80)
